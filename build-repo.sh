@@ -1,4 +1,5 @@
-export release="xenial"
+export release=$(cat distribution.buildinfo)
+export distribution=$(cat distribution.buildinfo)
 mkdir -p binaries
 
 for suffix in gz bz2 xz deb dsc changes ; do
