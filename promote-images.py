@@ -2,7 +2,27 @@
 
 # I promote images!
 
-import argparse, subprocess, os
+import argparse, subprocess, os, requests
+
+
+def checkGithubLabel(label):
+    issuesPayload = {"labels": label, "state": "open"}
+    issues = requests.get("https://api.github.com/repos/ubports/ubuntu-touch/issues", params=issuesPayload)
+    issuesJson = issues.json()
+
+    # Set blocker to normally True, and only if == 0 set to False
+    blocker = True
+    if len(issuesJson) == 0:
+        blocker = False
+
+    if blocker:
+        print("!! Github label blocker !!\n")
+        print("Following issues is blocking:")
+        for iss in issuesJson:
+            print("- %s (%s)" % (iss["title"], iss["html_url"]))
+        exit()
+
+    return blocker
 
 parser = argparse.ArgumentParser(description='I promote images!')
 parser.add_argument("copy_images_script", metavar="COPY-IMAGES-SCRIPT")
@@ -19,10 +39,22 @@ parser.add_argument("-p", "--phased-percentage", type=int,
 parser.add_argument("-t", "--tag", type=str,
                     help="Set a version tag on the new image")
 parser.add_argument("--verbose", "-v", action="count", default=0)
+parser.add_argument("-l", "--label", type=str, action="append",
+                    help="Github label blocker to check for (default: 'critical (rc),critical (devel)')")
 
 args = parser.parse_args()
 
 devices = []
+
+# Workaround for python bug 16399
+if not args.label:
+    args.label = ["critical (devel)", "critical (rc)"]
+
+
+for lab in args.label:
+    checkGithubLabel(lab)
+
+print("No Github blocker, Promoting images")
 
 if not os.path.isfile(args.copy_images_script):
     print("%s is not a file" % args.copy_images_script)
