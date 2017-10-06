@@ -70,7 +70,7 @@ else:
     print("Device list %s not found" % args.device_list)
     exit()
 
-copyImageArgs = [args.copy_images_script, args.destination_channel, args.source_channel]
+copyImageArgs = [args.copy_images_script, args.source_channel, args.destination_channel]
 
 copyImageArgs2 = []
 
