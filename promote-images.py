@@ -39,6 +39,7 @@ parser.add_argument("-p", "--phased-percentage", type=int,
 parser.add_argument("-t", "--tag", type=str,
                     help="Set a version tag on the new image")
 parser.add_argument("--verbose", "-v", action="count", default=0)
+parser.add_argument("--dry", "-d", help="Do a dry run", action="store_true")
 parser.add_argument("-l", "--label", type=str, action="append",
                     help="Github label blocker to check for (default: 'critical (rc),critical (devel)')")
 
@@ -58,7 +59,8 @@ print("No Github blocker, Promoting images")
 
 if not os.path.isfile(args.copy_images_script):
     print("%s is not a file" % args.copy_images_script)
-    exit()
+    if not args.dry:
+        exit()
 
 if os.path.isfile(args.device_list):
     with open(args.device_list) as f:
@@ -91,5 +93,7 @@ if args.verbose and args.verbose != 0:
 for device in devices:
     cmd = copyImageArgs + [device] + copyImageArgs2
     print("Promoting %s to %s from %s" % (device, args.destination_channel, args.source_channel))
-    print(cmd)
-    subprocess.run(cmd, check=True)
+    if args.dry:
+        print(cmd)
+    else:
+        subprocess.run(cmd, check=True)
