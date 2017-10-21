@@ -15,15 +15,18 @@
 
 set -xe
 
-export BUILD_ONLY=true
-export DEB_BUILD_OPTIONS="parallel=$(nproc) nocheck"
+export release=$(cat branch.buildinfo)
 export distribution=$(cat distribution.buildinfo)
+export architecture="armhf"
+export REPOS="$release"
 
-generate_repo_extra.py
-if [ -f ubports.repos_extra ]; then
-  export REPOSITORY_EXTRA=$(cat ubports.repos_extra)
-  export REPOSITORY_EXTRA_KEYS="http://repo.ubports.com/keyring.gpg"
-  echo "INFO: Adding extra repo $REPOSITORY_EXTRA"
-fi
+mkdir -p binaries
 
+for suffix in gz bz2 xz deb dsc changes ; do
+  mv *.${suffix} binaries/ || true
+done
+
+export BASE_PATH="binaries/"
+export PROVIDE_ONLY=true
+export SUDO_CMD=sudo
 /usr/bin/build-and-provide-package
