@@ -50,12 +50,12 @@ def get_ubports_depends():
     return depend
 
 def is_extension(branch):
-    return "+" in branch
+    return "_-_" in branch
 
 def extension_get_base_repo(branch):
     if not is_extension(branch):
         return;
-    return branch.split("+")[0]
+    return branch.split("_-_")[0]
 
 depends_list = []
 

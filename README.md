@@ -64,14 +64,16 @@ Branch extension is a quick and simple way to create packages that depend on
 other packages in a different repo instead of rebulding all packaged,
 you can simply create a "branch extension" like this:
 ```
-[depend repo]+[branch name]
+[depend repo]_-_[branch name]
 ```
 
 Example:
 
 ```
-xenial+awesometest
+xenial_-_awesometest
 ```
+
+NOTE: due to a silly bug in jenkins we have to use "_-_"
 
 #### Using ubports.depend file
 
