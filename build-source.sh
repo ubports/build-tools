@@ -1,3 +1,6 @@
+
+set -e
+
 DIST="vivid xenial"
 DIST_DEV="vivid-dev xenial-dev"
 

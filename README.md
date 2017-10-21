@@ -54,3 +54,32 @@ deb http://repo.ubports.com/ vivid main
 
 - Don't use `-` in version names (debian/changelog)
 - Don't use source format `3.0 quit`
+
+### Depend on other repos:
+By default it will add itself and ubuntu-stable-phone ppa
+
+#### Using "branch extension"
+
+Branch extension is a quick and simple way to create packages that depend on
+other packages in a different repo instead of rebulding all packaged,
+you can simply create a "branch extension" like this:
+```
+[depend repo]+[branch name]
+```
+
+Example:
+
+```
+xenial+awesometest
+```
+
+#### Using ubports.depend file
+
+Using file is a more permanent way to add depending repos, add one repo per line
+
+Example:
+
+```
+xenial
+xenial-caf
+```

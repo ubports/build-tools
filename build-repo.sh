@@ -1,11 +1,15 @@
-export release=$(cat distribution.buildinfo)
+
+set -xe
+
+export BUILD_ONLY=true
+export DEB_BUILD_OPTIONS="parallel=$(nproc) nocheck"
 export distribution=$(cat distribution.buildinfo)
-mkdir -p binaries
 
-for suffix in gz bz2 xz deb dsc changes ; do
-  mv *.${suffix} binaries/ || true
-done
+generate_repo_extra.py
+if [ -f ubports.repos_extra ]; then
+  export REPOSITORY_EXTRA=$(cat ubports.repos_extra)
+  export REPOSITORY_EXTRA_KEYS="http://repo.ubports.com/keyring.gpg"
+  echo "INFO: Adding extra repo $REPOSITORY_EXTRA"
+fi
 
-export BASE_PATH="binaries/"
-export PROVIDE_ONLY=true
 /usr/bin/build-and-provide-package
