@@ -32,8 +32,9 @@ export GIT_BRANCH=$BRANCH_NAME
 cd ..
 
 if [ -f source/ubports.source_location ]; then
-  wget $(head -n 1 source/ubports.source_location)
+  wget -O $(head -n 2 source/ubports.source_location | tail -1) $(head -n 1 source/ubports.source_location)
   export IGNORE_GIT_BUILDPACKAGE=true
+  export USE_ORIG_VERSION=true
 fi
 
 if echo $DIST | grep -w $GIT_BRANCH > /dev/null; then
