@@ -38,6 +38,7 @@ if [ -f source/ubports.source_location ]; then
   export USE_ORIG_VERSION=true
   export SKIP_DCH=true
   export SKIP_PRE_CLEANUP=true
+  export SKIP_GIT_CLEANUP=true
   rm source/Jenkinsfile || true
   rm source/ubports.source_location || true
 fi
