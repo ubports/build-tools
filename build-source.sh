@@ -33,6 +33,7 @@ cd ..
 
 if [ -f source/ubports.source_location ]; then
   wget $(head -n 1 source/ubports.source_location)
+  export IGNORE_GIT_BUILDPACKAGE=true
 fi
 
 if echo $DIST | grep -w $GIT_BRANCH > /dev/null; then
