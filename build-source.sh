@@ -35,6 +35,7 @@ if [ -f source/ubports.source_location ]; then
   wget -O $(head -n 2 source/ubports.source_location | tail -1) $(head -n 1 source/ubports.source_location)
   export IGNORE_GIT_BUILDPACKAGE=true
   export USE_ORIG_VERSION=true
+  export SKIP_DCH=true
 fi
 
 if echo $DIST | grep -w $GIT_BRANCH > /dev/null; then
