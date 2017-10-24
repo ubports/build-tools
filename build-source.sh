@@ -31,6 +31,10 @@ export GIT_COMMIT=$(git rev-parse HEAD)
 export GIT_BRANCH=$BRANCH_NAME
 cd ..
 
+if [ -f ubports.source_location ]; then
+  wget $(head -n 1 ubports.source_location)
+fi
+
 if echo $DIST | grep -w $GIT_BRANCH > /dev/null; then
         echo "This is on a release branch, overriding dist to $GIT_BRANCH"
         export DIST_OVERRIDE=$GIT_BRANCH
