@@ -31,8 +31,8 @@ export GIT_COMMIT=$(git rev-parse HEAD)
 export GIT_BRANCH=$BRANCH_NAME
 cd ..
 
-if [ -f ubports.source_location ]; then
-  wget $(head -n 1 ubports.source_location)
+if [ -f source/ubports.source_location ]; then
+  wget $(head -n 1 source/ubports.source_location)
 fi
 
 if echo $DIST | grep -w $GIT_BRANCH > /dev/null; then
