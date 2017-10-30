@@ -27,4 +27,9 @@ if [ -f ubports.repos_extra ]; then
   echo "INFO: Adding extra repo $REPOSITORY_EXTRA"
 fi
 
+# Since we dont build arm64 yet, lets also force build of "all"
+export DEBBUILDOPTS=-sa
+export SKIP_ARCH_BUILD=false
+export SKIP_SOURCE_REMOVAL=true
+
 /usr/bin/build-and-provide-package
