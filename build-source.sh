@@ -70,3 +70,10 @@ echo "Gen git snapshot done"
 
 rm *.changes
 echo "$GIT_BRANCH" > branch.buildinfo
+
+# If this is a pull request, we want to also use the target repository for
+# dependency checking. To do so, add the name of the target branch (which is in
+# the CHANGE_TARGET environment variable) to the ubports.depends file.
+if [ -n "${CHANGE_TARGET}" ]; then
+  echo "${CHANGE_TARGET}" >> ubports.depends
+fi
