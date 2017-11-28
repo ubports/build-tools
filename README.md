@@ -73,7 +73,7 @@ Example:
 xenial_-_awesometest
 ```
 
-NOTE: due to a silly bug in jenkins we have to use "_-_"
+NOTE: due to a silly bug in jenkins we have to use `_-_`
 
 #### Using ubports.depend file
 
