@@ -27,6 +27,9 @@ ls source
 set -ex
 
 cd source
+if [ -f .gitmodules ]; then
+  git submodule update --init --recursive
+fi
 export GIT_COMMIT=$(git rev-parse HEAD)
 export GIT_BRANCH=$BRANCH_NAME
 cd ..
