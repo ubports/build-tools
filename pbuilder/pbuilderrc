@@ -1,0 +1,27 @@
+# this is your configuration file for pbuilder.
+# the file in /usr/share/pbuilder/pbuilderrc is the default template.
+# /etc/pbuilderrc is the one meant for overwriting defaults in
+# the default template
+#
+# read pbuilderrc.5 document for notes on specific options.
+if [ "${ARCH}" = "armhf" ] || [ "${ARCH}" = "arm64" ]; then
+	MIRRORSITE=http://ports.ubuntu.com/ubuntu-ports/
+else
+	MIRRORSITE=http://archive.ubuntu.com/ubuntu/
+fi
+
+COMPONENTS="main restricted universe multiverse"
+OTHERMIRROR="deb $MIRRORSITE $DIST-security main restricted universe multiverse"
+OTHERMIRROR="$OTHERMIRROR | deb $MIRRORSITE $DIST-updates main restricted universe multiverse"
+
+# Arrr!
+if [ "$DIST" == "vivid" ]; then
+        MIRRORSITE=http://old-releases.ubuntu.com/ubuntu
+        OTHERMIRROR="deb http://old-releases.ubuntu.com/ubuntu vivid-security main restricted universe multiverse"
+fi
+
+DEB_BUILD_OPTIONS="parallel=$(nproc) nocheck"
+export DEB_BUILD_OPTIONS="parallel=$(nproc) nocheck"
+
+PBUILDERSATISFYDEPENDSCMD="/usr/lib/pbuilder/pbuilder-satisfydepends-gdebi"
+EXTRAPACKAGES="pkg-create-dbgsym"
