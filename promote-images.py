@@ -111,4 +111,4 @@ for device in devices:
     if args.dry:
         print(cmd)
     else:
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=False)
