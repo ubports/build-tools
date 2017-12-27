@@ -16,6 +16,7 @@
 
 set -ex
 
+export PYTHONIOENCODING=UTF-8
 export BUILD_ONLY=true
 export DEB_BUILD_OPTIONS="parallel=$(nproc) nocheck"
 export distribution=$(cat distribution.buildinfo)
