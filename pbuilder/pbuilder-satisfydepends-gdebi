@@ -1,0 +1,45 @@
+#!/bin/bash
+#   pbuilder -- personal Debian package builder
+#   Copyright (C) 2001,2002,2003,2005-2007 Junichi Uekawa
+#
+#   This program is free software; you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation; either version 2 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program; if not, write to the Free Software
+#   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
+
+#
+# module to satisfy dependency using gdebi
+# AUTHOR: Michael Vogt <mvogt@acm.org>
+
+set -e
+
+function checkbuilddep_internal () {
+    if ! [ -x /usr/bin/gdebi ]; then
+        echo "E: You need the gdebi-core package to resolve build-deps using gdebi" >&2
+        exit 1
+    fi
+
+    NO_RECOMMENDS=""
+    if VERSION=$(/usr/bin/gdebi --version 2>/dev/null); then
+        if dpkg --compare-versions "$VERSION" ge 0.3.9; then
+            NO_RECOMMENDS="-o APT::Install-Recommends=false"
+        fi
+    fi
+
+    CLEAN_CONT=$(mktemp /tmp/clean-cont.XXXXXX.dsc)
+    perl -pe 's/[^[:ascii:]]//g' "$DEBIAN_CONTROL" > $CLEAN_CONT
+
+    INSTALL=$(/usr/bin/gdebi --quiet --root "$CHROOT" --apt-line "$NO_RECOMMENDS" "$CLEAN_CONT")
+    $CHROOTEXEC /usr/bin/apt-get install -y "${APTGETOPT[@]}" $INSTALL
+}
+
+. "${BASH_SOURCE%/*}/pbuilder-satisfydepends-checkparams"
