@@ -54,7 +54,6 @@ deb http://repo.ubports.com/ vivid main
 
 - Don't use `-` in version names (debian/changelog)
 - Don't use source format `3.0 quit`
-- gdebi does not handle non English characters in debian/control
 
 ### Depend on other repos:
 By default it will add itself and ubuntu-stable-phone ppa
