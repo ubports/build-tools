@@ -75,7 +75,7 @@ xenial_-_awesometest
 
 NOTE: due to a silly bug in jenkins we have to use `_-_`
 
-#### Using ubports.depend file
+#### Using ubports.depends file
 
 Using file is a more permanent way to add depending repos, add one repo per line
 
