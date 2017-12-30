@@ -21,6 +21,9 @@ export BUILD_ONLY=true
 export DEB_BUILD_OPTIONS="parallel=$(nproc) nocheck"
 export distribution=$(cat distribution.buildinfo)
 
+if [ -f ubports.depends.buildinfo ]; then
+	mv ubports.depends.buildinfo ubports.depends
+fi
 generate_repo_extra.py
 if [ -f ubports.repos_extra ]; then
   export REPOSITORY_EXTRA="$(cat ubports.repos_extra)"

@@ -78,5 +78,9 @@ echo "$GIT_BRANCH" > branch.buildinfo
 # dependency checking. To do so, add the name of the target branch (which is in
 # the CHANGE_TARGET environment variable) to the ubports.depends file.
 if [ -n "${CHANGE_TARGET}" ]; then
-  echo "${CHANGE_TARGET}" >> ubports.depends
+  echo "${CHANGE_TARGET}" >> source/ubports.depends
+fi
+
+if [ -f source/ubports.depends ]; then
+        cp source/ubports.depends ubports.depends.buildinfo
 fi
