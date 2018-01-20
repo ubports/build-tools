@@ -51,17 +51,17 @@ def get_ubports_depends():
     return depend
 
 def is_arch_ext(branch):
-    return ":" in branch
+    return "@" in branch
 
 def arch_extension_get_base_branch(branch):
     if not is_arch_ext(branch):
         return;
-    return branch.split(":")[0]
+    return branch.split("@")[0]
 
 def arch_extension_get_arch(branch):
     if not is_arch_ext(branch):
         return;
-    return branch.split(":")[-1]
+    return branch.split("@")[-1]
 
 def is_arch_valid(arch):
     return arch in VALID_ARCH
