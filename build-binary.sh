@@ -34,7 +34,7 @@ fi
 if [ -f ubports.architecture ]; then
   THIS_ARCH=$(dpkg --print-architecture)
 	REQUEST_ARCH=$(cat ubports.architecture)
-	if [ ! $THIS_ARCH == $REQUEST_ARCH ]; then
+	if [ ! "$THIS_ARCH" == "$REQUEST_ARCH" ]; then
 		echo "My arch $THIS_ARCH does not match requested arch $REQUEST_ARCH, quiting"
 		exit 0
 	fi
