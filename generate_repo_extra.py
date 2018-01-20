@@ -86,6 +86,8 @@ if is_arch_ext(branch):
         print("Arch %s" % arch)
         with open("ubports.architecture", "w") as f:
             f.write(arch)
+        with open("branch.buildinfo", "w") as f:
+            f.write(branch)
     else:
         print("ERROR: Arch '%s' is not valid" % arch)
         sys.exit(1)
