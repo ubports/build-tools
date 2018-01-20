@@ -18,6 +18,7 @@
 import requests, os, sys
 
 DEB_SOURCE_TEMPLATE = "deb http://repo.ubports.com/ %s main"
+VALID_ARCH = ["armhf", "arm64", "amd64"]
 
 def repo_exist(repo):
     r = requests.get("http://repo.ubports.com/dists/%s/Release" % repo)
@@ -49,6 +50,22 @@ def get_ubports_depends():
     depend = [x.strip() for x in depend]
     return depend
 
+def is_arch_ext(branch):
+    return ":" in branch
+
+def arch_extension_get_base_branch(branch):
+    if not is_arch_ext(branch):
+        return;
+    return branch.split(":")[0]
+
+def arch_extension_get_arch(branch):
+    if not is_arch_ext(branch):
+        return;
+    return branch.split(":")[-1]
+
+def is_arch_valid(arch):
+    return arch in VALID_ARCH
+
 def is_extension(branch):
     return "_-_" in branch
 
@@ -60,6 +77,18 @@ def extension_get_base_repo(branch):
 depends_list = []
 
 branch = get_branch()
+
+# Extension arch
+if is_arch_ext(branch):
+    arch = arch_extension_get_arch(branch)
+    branch = arch_extension_get_base_branch(branch)
+    if is_arch_valid(arch):
+        print("Arch %s" % arch)
+        with open("ubports.architecture", "w") as f:
+            f.write(arch)
+    else:
+        print("ERROR: Arch '%s' is not valid" % arch)
+        sys.exit(1)
 
 # Working repo
 if repo_exist(branch):
@@ -88,6 +117,8 @@ if ubports_depends_exist():
         else:
             print("ERROR: ubports.depends repo '%s' do not exist" % _depend)
             sys.exit(1)
+
+print("Branches %s " % depends_list)
 
 deb_sources_list = []
 for _depend in depends_list:
