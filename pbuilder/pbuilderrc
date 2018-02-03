@@ -16,12 +16,18 @@ OTHERMIRROR="$OTHERMIRROR | deb $MIRRORSITE $DIST-updates main restricted univer
 
 # Arrr!
 if [ "$DIST" == "vivid" ]; then
-        MIRRORSITE=http://old-releases.ubuntu.com/ubuntu
-        OTHERMIRROR="deb http://old-releases.ubuntu.com/ubuntu vivid-security main restricted universe multiverse"
+  MIRRORSITE=http://old-releases.ubuntu.com/ubuntu
+  OTHERMIRROR="deb http://old-releases.ubuntu.com/ubuntu vivid-security main restricted universe multiverse"
 fi
 
 DEB_BUILD_OPTIONS="parallel=$(nproc) nocheck"
 export DEB_BUILD_OPTIONS="parallel=$(nproc) nocheck"
 
+PYTHONIOENCODING=UTF-8
+LC_CTYPE=en_US.UTF-8
+
 PBUILDERSATISFYDEPENDSCMD="/usr/lib/pbuilder/pbuilder-satisfydepends-gdebi"
-EXTRAPACKAGES="pkg-create-dbgsym"
+
+if [ "$DIST" != "artful" && "$DIST" != "bionic" ]; then
+	EXTRAPACKAGES="pkg-create-dbgsym"
+fi
