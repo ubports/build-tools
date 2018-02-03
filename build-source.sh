@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-DIST="vivid xenial"
+DIST="vivid xenial artful bionic"
 DIST_DEV="vivid-dev xenial-dev"
 
 if [ ! "$SKIP_MOVE" = "true" ]; then
