@@ -4,21 +4,6 @@
 # the default template
 #
 # read pbuilderrc.5 document for notes on specific options.
-if [ "${ARCH}" = "armhf" ] || [ "${ARCH}" = "arm64" ]; then
-	MIRRORSITE=http://ports.ubuntu.com/ubuntu-ports/
-else
-	MIRRORSITE=http://archive.ubuntu.com/ubuntu/
-fi
-
-COMPONENTS="main restricted universe multiverse"
-OTHERMIRROR="deb $MIRRORSITE $DIST-security main restricted universe multiverse"
-OTHERMIRROR="$OTHERMIRROR | deb $MIRRORSITE $DIST-updates main restricted universe multiverse"
-
-# Arrr!
-if [ "$DIST" == "vivid" ]; then
-  MIRRORSITE=http://old-releases.ubuntu.com/ubuntu
-  OTHERMIRROR="deb http://old-releases.ubuntu.com/ubuntu vivid-security main restricted universe multiverse"
-fi
 
 DEB_BUILD_OPTIONS="parallel=$(nproc) nocheck"
 export DEB_BUILD_OPTIONS="parallel=$(nproc) nocheck"
@@ -28,6 +13,41 @@ LC_CTYPE=en_US.UTF-8
 
 PBUILDERSATISFYDEPENDSCMD="/usr/lib/pbuilder/pbuilder-satisfydepends-gdebi"
 
-if [ "$DIST" != "artful" && "$DIST" != "bionic" ]; then
-	EXTRAPACKAGES="pkg-create-dbgsym"
+
+# Ubuntu / Debian
+
+UNSTABLE_CODENAME="sid"
+TESTING_CODENAME="buster"
+STABLE_CODENAME="stretch"
+STABLE_BACKPORTS_SUITE="$STABLE_CODENAME-backports"
+DEBIAN_MIRROR="ftp.us.debian.org"
+
+# List of Debian suites.
+DEBIAN_SUITES=($UNSTABLE_CODENAME $TESTING_CODENAME $STABLE_CODENAME
+    "unstable" "testing" "stable")
+
+if $(echo ${DEBIAN_SUITES[@]} | grep -q $DIST); then
+	MIRRORSITE="http://$DEBIAN_MIRROR/debian/"
+	COMPONENTS="main contrib non-free"
+else
+	# At this point we say if not debian, it's ubuntu. this might change
+	if [ "${ARCH}" = "armhf" ] || [ "${ARCH}" = "arm64" ]; then
+		MIRRORSITE=http://ports.ubuntu.com/ubuntu-ports/
+	else
+		MIRRORSITE=http://archive.ubuntu.com/ubuntu/
+	fi
+
+	COMPONENTS="main restricted universe multiverse"
+	OTHERMIRROR="deb $MIRRORSITE $DIST-security main restricted universe multiverse"
+	OTHERMIRROR="$OTHERMIRROR | deb $MIRRORSITE $DIST-updates main restricted universe multiverse"
+
+	# Arrr!
+	if [ "$DIST" == "vivid" ]; then
+	  MIRRORSITE=http://old-releases.ubuntu.com/ubuntu
+	  OTHERMIRROR="deb http://old-releases.ubuntu.com/ubuntu vivid-security main restricted universe multiverse"
+	fi
+
+	if [ "$DIST" != "artful" ] && [ "$DIST" != "bionic" ]; then
+		EXTRAPACKAGES="pkg-create-dbgsym"
+	fi
 fi
