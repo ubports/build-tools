@@ -13,6 +13,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+
+# Multi distro, set here to build master for multripple distros!
+MULTI_DIST="xenial bionic"
+
 DIST="vivid xenial artful bionic"
 DIST_DEV="vivid-dev xenial-dev"
 
@@ -38,7 +42,6 @@ if [ -f source/ubports.source_location ]; then
   rm $(head -n 2 source/ubports.source_location | tail -1) || true
   wget -O $(head -n 2 source/ubports.source_location | tail -1) $(head -n 1 source/ubports.source_location)
   export IGNORE_GIT_BUILDPACKAGE=true
-  export USE_ORIG_VERSION=true
   export SKIP_DCH=true
   export SKIP_PRE_CLEANUP=true
   export SKIP_GIT_CLEANUP=true
@@ -58,20 +61,31 @@ if echo "xenial-dev" | grep -w $GIT_BRANCH > /dev/null; then
         echo "This is on a release branch, overriding dist to xenial"
         export DIST_OVERRIDE="xenial"
 fi
-/usr/bin/generate-git-snapshot
-echo "Gen git snapshot done"
 
-# Disable ppa since ppa does not build vivid anymore....
-#if echo $DIST | grep -w $GIT_BRANCH > /dev/null; then
-#        echo "dputing"
-        #dput ppa:ubports-developers/overlay *.changes
-#fi
-#if echo $DIST_DEV | grep -w $GIT_BRANCH > /dev/null; then
-#        echo "dev dputing"
-        #dput ppa:ubports-developers/overlay-dev *.changes
-#fi
+# Multi dist build for "master" only
+# We might want to expand this to allow PR's to build like this
+if [ "$GIT_BRANCH" == "master" ]; then
+  echo "Doing multi build!"
+  for d in $MULTI_DIST ; do
+    echo "Gen git snapshot for $d"
+    export TIMESTAMP_FORMAT="$d%Y%m%d%H%M%S"
+    export DIST_OVERRIDE="$d"
+    /usr/bin/generate-git-snapshot
+    mkdir -p "mbuild/$d"
+    mv *+0~$d* "mbuild/$d"
+    rm mbuild/$d/*.changes || true
+    unset TIMESTAMP_FORMAT
+    unset DIST_OVERRIDE
+  done
+  tar -zcvf multidist.tar.gz mbuild
+  echo "$MULTI_DIST" > multidist.buildinfo
+else
+  export TIMESTAMP_FORMAT="$d%Y%m%d%H%M%S"
+  /usr/bin/generate-git-snapshot
+  rm *.changes
+  echo "Gen git snapshot done"
+fi
 
-rm *.changes
 echo "$GIT_BRANCH" > branch.buildinfo
 
 # If this is a pull request, we want to also use the target repository for

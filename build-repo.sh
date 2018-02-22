@@ -15,18 +15,47 @@
 
 set -xe
 
-export release=$(cat branch.buildinfo)
-export distribution=$(cat distribution.buildinfo)
-export architecture="armhf"
-export REPOS="$release"
-
 mkdir -p binaries
 
-for suffix in gz bz2 xz deb dsc changes ; do
-  mv *.${suffix} binaries/ || true
-done
-
-export BASE_PATH="binaries/"
 export PROVIDE_ONLY=true
 export SUDO_CMD=sudo
-/usr/bin/build-and-provide-package
+
+if [ -f multidist.buildinfo ]; then
+	echo "Doing multibuild"
+	MULTI_DIST=$(cat multidist.buildinfo)
+  for t in multidist*.tar.gz ; do
+    tar --overwrite -xvzf $t
+  done
+	rm multidist*.tar.gz || true
+  export rootwp=$(pwd)
+
+	for d in $MULTI_DIST ; do
+		echo "Repo-ing for $d"
+		export distribution="$d"
+    export release="$d"
+    export REPOS="$release"
+    export WORKSPACE="$rootwp/mbuild/$d"
+    export SHIP_FREIGHT_CACHE=true
+    cd "$WORKSPACE"
+    mkdir binaries/ || true
+    for suffix in gz bz2 xz deb dsc changes ; do
+      mv *.${suffix} binaries/ || true
+    done
+    export BASE_PATH="binaries/"
+		/usr/bin/build-and-provide-package
+    for suffix in gz bz2 xz deb dsc changes ; do
+      mv binaries/*.${suffix} $rootwp || true
+    done
+    cd $rootwp
+	done
+  sudo freight cache -v -c /etc/freight.conf
+else
+  export release=$(cat branch.buildinfo)
+  export distribution=$(cat distribution.buildinfo)
+  export REPOS="$release"
+  export BASE_PATH="binaries/"
+  for suffix in gz bz2 xz deb dsc changes ; do
+    mv *.${suffix} binaries/ || true
+  done
+	/usr/bin/build-and-provide-package
+fi

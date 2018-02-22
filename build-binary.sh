@@ -1,4 +1,4 @@
-# Copyright (C) 2017 Marius Gripsgard <marius@ubports.com>
+# Copyright (C) 2017,2018 Marius Gripsgard <marius@ubports.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,13 +13,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
 set -ex
 
 export PYTHONIOENCODING=UTF-8
 export BUILD_ONLY=true
 export DEB_BUILD_OPTIONS="parallel=$(nproc) nocheck"
-export distribution=$(cat distribution.buildinfo)
 
 if [ -f ubports.depends.buildinfo ]; then
 	mv ubports.depends.buildinfo ubports.depends
@@ -40,4 +38,25 @@ if [ -f ubports.architecture ]; then
 	fi
 fi
 
-/usr/bin/build-and-provide-package
+if [ -f multidist.buildinfo ]; then
+	echo "Doing multibuild"
+	MULTI_DIST=$(cat multidist.buildinfo)
+	tar -xvzf multidist.tar.gz
+	rm multidist.tar.gz
+	export rootwp=$(pwd)
+
+	for d in $MULTI_DIST ; do
+		echo "Bulding for $d"
+		export distribution=$d
+		export REPOSITORY_EXTRA="deb http://repo.ubports.com/ $d main"
+		export WORKSPACE="$rootwp/mbuild/$d"
+		cd "$WORKSPACE"
+		rm -r adt *.gpg || true
+		/usr/bin/build-and-provide-package
+		cd $rootwp
+	done
+	tar -zcvf multidist-$architecture-$RANDOM.tar.gz mbuild
+else
+	export distribution=$(cat distribution.buildinfo)
+	/usr/bin/build-and-provide-package
+fi
