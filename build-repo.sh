@@ -35,7 +35,6 @@ if [ -f multidist.buildinfo ]; then
     export release="$d"
     export REPOS="$release"
     export WORKSPACE="$rootwp/mbuild/$d"
-    export SHIP_FREIGHT_CACHE=true
     cd "$WORKSPACE"
     mkdir binaries/ || true
     for suffix in gz bz2 xz deb dsc changes ; do
@@ -48,7 +47,6 @@ if [ -f multidist.buildinfo ]; then
     done
     cd $rootwp
 	done
-  sudo freight cache -v -c /etc/freight.conf
 else
   export release=$(cat branch.buildinfo)
   export distribution=$(cat distribution.buildinfo)
