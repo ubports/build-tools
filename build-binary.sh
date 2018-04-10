@@ -17,7 +17,13 @@ set -ex
 
 export PYTHONIOENCODING=UTF-8
 export BUILD_ONLY=true
-export DEB_BUILD_OPTIONS="parallel=$(nproc) nocheck"
+
+if [ -f ubports.no_test.buildinfo ]; then
+	export DEB_BUILD_OPTIONS="parallel=$(nproc) nocheck"
+	rm ubports.no_test.buildinfo
+else
+	export DEB_BUILD_OPTIONS="parallel=$(nproc)"
+fi
 
 if [ -f ubports.depends.buildinfo ]; then
 	mv ubports.depends.buildinfo ubports.depends

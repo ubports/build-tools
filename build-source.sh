@@ -98,3 +98,6 @@ fi
 if [ -f source/ubports.depends ]; then
         cp source/ubports.depends ubports.depends.buildinfo
 fi
+if [ -f source/ubports.no_test ]; then
+        cp source/ubports.no_test ubports.no_test.buildinfo
+fi
