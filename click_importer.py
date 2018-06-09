@@ -59,7 +59,7 @@ def get_app_info(app):
     return r.json()["data"]
 
 def download_app(url, id, dest):
-    fileName = "%s.click" % id
+    fileName = "%s_armhf.click" % id
     request = requests.get(url, stream=True)
     try:
         total_length = int(request.headers.get('content-length'))
