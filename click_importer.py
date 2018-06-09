@@ -58,8 +58,8 @@ def get_app_info(app):
         return False
     return r.json()["data"]
 
-def download_app(url, dest):
-    fileName = os.path.basename(url)
+def download_app(url, id, dest):
+    fileName = "%s.click" % id
     request = requests.get(url, stream=True)
     try:
         total_length = int(request.headers.get('content-length'))
@@ -79,10 +79,10 @@ def download_app(url, dest):
 DEFAULT_DIR="clicks"
 BASE_API="http://open-store.io/api/v3/"
 APPS_API=BASE_API+"apps/"
-DOWNLOAD_API=APPS_API+"%s/download/xenial"
 
 parser = argparse.ArgumentParser(description='I import clicks from the openstore')
 parser.add_argument("--dir", "-o", help="output directory", type=str)
+parser.add_argument("--channel", "-c", help="channel to download from (default xenial)", type=str)
 parser.add_argument("--dry", "-n", help="do a dry run", action='store_true')
 group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument("--file", "-f", help="file with list of apps to import", type=str)
@@ -91,7 +91,11 @@ group.add_argument("--apps", "-a", nargs="+", help="apps to import")
 args = parser.parse_args()
 
 output_dir = DEFAULT_DIR;
+channel = "xenial"
 apps = args.apps
+
+if args.channel:
+    channel = args.channel
 
 if args.dir:
     if not os.path.exists(args.dir):
@@ -111,15 +115,23 @@ ctrl = Ctrl(output_dir)
 for app in apps:
     app_info = get_app_info(app)
     if app_info:
-        if ctrl.isNew(app_info["id"], app_info["revision"]):
-            print("New version of %s" % app_info["name"])
+        download_found = False
+        for download in app_info["downloads"]:
+            if download["channel"] == channel:
+                download_found = download
+
+        if (download_found):
+            if ctrl.isNew(app_info["id"], download_found["revision"]):
+                print("New version of %s" % app_info["name"])
+            else:
+                print("No new version of %s" % app_info["name"])
+                continue
+            if args.dry:
+                print("downloading %s" % app_info["name"])
+            else:
+                download_app(download_found["download_url"], app_info["id"], output_dir)
+            ctrl.update(app_info["id"], app_info["revision"])
         else:
-            print("No new version of %s" % app_info["name"])
-            continue
-        if args.dry:
-            print("downloading %s" % app_info["name"])
-        else:
-            download_app(DOWNLOAD_API % app_info["id"], output_dir)
-        ctrl.update(app_info["id"], app_info["revision"])
+            print("Could not find %s in channel %s" % (app_info["name"], channel))
     else:
-        print("Could find fine app %s... ignoring" % app)
+        print("Could find fined app %s... ignoring" % app)
