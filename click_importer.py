@@ -61,21 +61,25 @@ def get_app_info(app):
 def download_app(url, dest):
     fileName = os.path.basename(url)
     request = requests.get(url, stream=True)
+    try:
+        total_length = int(request.headers.get('content-length'))
+    except Exception as e:
+        print("failed to download")
+        return
     if not os.path.exists(dest):
         os.makedirs(dest)
     if os.path.isfile("%s/%s.tmp" % (dest, fileName)):
         os.remove("%s/%s.tmp" % (dest, fileName))
     with open("%s/%s.tmp" % (dest, fileName), "wb") as handle:
-        total_length = int(request.headers.get('content-length'))
         for data in tqdm.tqdm(request.iter_content(chunk_size=1024), total=total_length/1024, leave=True, unit='B', unit_scale=True):
             handle.write(data)
     os.rename("%s/%s.tmp" % (dest, fileName), "%s/%s" % (dest, fileName))
     return "%s/%s" % (dest, fileName)
 
 DEFAULT_DIR="clicks"
-BASE_API="http://openstore.ubports.com/api/"
+BASE_API="http://open-store.io/api/v3/"
 APPS_API=BASE_API+"apps/"
-DOWNLOAD_API=BASE_API+"download/"
+DOWNLOAD_API=APPS_API+"%s/download/xenial"
 
 parser = argparse.ArgumentParser(description='I import clicks from the openstore')
 parser.add_argument("--dir", "-o", help="output directory", type=str)
@@ -115,7 +119,7 @@ for app in apps:
         if args.dry:
             print("downloading %s" % app_info["name"])
         else:
-            download_app(app_info["download"], output_dir)
+            download_app(DOWNLOAD_API % app_info["id"], output_dir)
         ctrl.update(app_info["id"], app_info["revision"])
     else:
         print("Could find fine app %s... ignoring" % app)
