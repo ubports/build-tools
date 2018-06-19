@@ -17,8 +17,21 @@
 
 # I promote images!
 
-import argparse, subprocess, os, requests
+import argparse, subprocess, os, requests, time
 
+def getLastTag(channel):
+    tag=None
+    index = requests.get("https://system-image.ubports.com/ubports-touch/16.04/%s/bacon/index.json" % channel)
+    if not index:
+        return tag
+    index = index.json()
+    if len(index["images"]) > 1:
+        raw_tag = index["images"][-2]["version_detail"].split(",")
+        for detail in raw_tag:
+            if detail.startswith("tag="):
+                tag = detail.split("=")[1]
+                break
+    return tag
 
 def checkGithubLabel(label):
     issuesPayload = {"labels": label, "state": "open"}
@@ -53,6 +66,10 @@ parser.add_argument("-p", "--phased-percentage", type=int,
                     default=100)
 parser.add_argument("-t", "--tag", type=str,
                     help="Set a version tag on the new image")
+parser.add_argument("-w", "--tag-weekly", action="store_true",
+                    help="Set weekly tag")
+parser.add_argument("-e", "--tag-ota", type=int,
+                    help="Set ota tag")
 parser.add_argument("--verbose", "-v", action="count", default=0)
 parser.add_argument("--dry", "-d", help="Do a dry run", action="store_true")
 parser.add_argument("-l", "--label", type=str, action="append",
@@ -85,6 +102,34 @@ else:
     print("Device list %s not found" % args.device_list)
     exit()
 
+new_tag = None
+
+if args.tag_weekly:
+    new_tag = time.strftime("%Y-W%V")
+    last_tag = getLastTag("rc")
+    print("Last image tag was %s" % last_tag)
+    if last_tag:
+        if last_tag == new_tag:
+            new_tag = "%s/2" % new_tag
+        elif "/" in last_tag:
+            ltag = last_tag.split("/")
+            if ltag[0] == new_tag:
+                new_tag = "%s/%i" % (new_tag, int(ltag[1])+1)
+    print("Setting tag to %s" % new_tag)
+
+
+if args.tag_ota:
+    last_tag = getLastTag("stable")
+    if last_tag:
+        if "OTA-" in last_tag:
+            last_ota_v = last_tag.split("-")[1]
+            print("last ota version was %s" % last_ota_v)
+            if int(args.tag_ota) <= int(last_ota_v):
+                print("Ota version cannot be lower or equal to last version! %s =< %s"
+                            % (args.tag_ota, last_ota_v))
+                exit()
+    new_tag = "OTA-%s" % args.tag_ota
+
 copyImageArgs = [args.copy_images_script, args.source_channel, args.destination_channel]
 
 copyImageArgs2 = []
@@ -97,8 +142,11 @@ if args.keep_version:
     copyImageArgs2 += ["-k"]
 if args.phased_percentage and args.phased_percentage != 100:
     copyImageArgs2 += ["-p", str(args.phased_percentage)]
-if args.tag:
-    copyImageArgs2 += ["-t", str(args.tag)]
+if new_tag:
+    copyImageArgs2 += ["-t", str(new_tag)]
+else:
+    if args.tag:
+        copyImageArgs2 += ["-t", str(args.tag)]
 if args.verbose and args.verbose != 0:
     a="-"
     for x in range(0, args.verbose):
