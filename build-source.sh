@@ -42,6 +42,7 @@ if [ -f source/ubports.source_location ]; then
   rm $(head -n 2 source/ubports.source_location | tail -1) || true
   wget -O $(head -n 2 source/ubports.source_location | tail -1) $(head -n 1 source/ubports.source_location)
   export IGNORE_GIT_BUILDPACKAGE=true
+  export USE_ORIG_VERSION=true
   export SKIP_DCH=true
   export SKIP_PRE_CLEANUP=true
   export SKIP_GIT_CLEANUP=true
