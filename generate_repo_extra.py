@@ -15,64 +15,81 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import requests, os, sys
+import requests
+import os
+import sys
 
 DEB_SOURCE_TEMPLATE = "deb http://repo.ubports.com/ %s main"
 VALID_ARCH = ["armhf", "arm64", "amd64"]
+
 
 def repo_exist(repo):
     r = requests.get("http://repo.ubports.com/dists/%s/Release" % repo)
     return r.status_code == 200
 
+
 def get_branch():
     if not os.path.isfile("branch.buildinfo"):
         print("ERROR: branch.buildinfo does not exist!")
         sys.exit(1)
-        return;
+        return
     with open("branch.buildinfo") as f:
         branch = f.read()
     return branch.strip()
 
+
 def ubports_depends_exist():
     return os.path.isfile("ubports.depends")
 
+
 def get_ubports_depends():
     if not ubports_depends_exist():
-        return;
+        return
     with open("ubports.depends") as f:
         depend = f.readlines()
 
     # Overflow check
     if len(depend) > 20:
         print("ERROR: depend overflow size %s" % len(depend))
-        return;
+        return
 
     depend = [x.strip() for x in depend]
     return depend
 
+
 def is_arch_ext(branch):
     return "@" in branch
 
+
 def arch_extension_get_base_branch(branch):
     if not is_arch_ext(branch):
-        return;
+        return
     return branch.split("@")[0]
+
 
 def arch_extension_get_arch(branch):
     if not is_arch_ext(branch):
-        return;
+        return
     return branch.split("@")[-1]
+
 
 def is_arch_valid(arch):
     return arch in VALID_ARCH
 
+
 def is_extension(branch):
     return "_-_" in branch
 
-def extension_get_base_repo(branch):
+
+def extension_get_repos(branch):
     if not is_extension(branch):
-        return;
-    return branch.split("_-_")[0]
+        return
+    split_list = branch.split("_-_")
+    branches = [split_list[0]]
+    for i in split_list[1:-1]:
+        branches.append("%s_-_%s" % (branches[-1], i))
+    return branches
+
 
 depends_list = []
 
@@ -100,12 +117,14 @@ else:
 
 # Extension repo
 if is_extension(branch):
-    base_extension = extension_get_base_repo(branch)
-    if repo_exist(base_extension):
-        depends_list.append(base_extension)
-    else:
-        print("ERROR: Extension repo '%s' do not exist" % base_extension)
-        sys.exit(1)
+    base_extensions = extension_get_repos(branch)
+    print(base_extensions)
+    for base_extension in base_extensions:
+        if repo_exist(base_extension):
+            depends_list.append(base_extension)
+        else:
+            print("ERROR: Extension repo '%s' do not exist" % base_extension)
+            sys.exit(1)
 
 # Depends file
 if ubports_depends_exist():
