@@ -179,9 +179,10 @@ for device in devices:
         subprocess.run(cmd, check=False)
         pushData = '{"%s/%s": [0, ""]}' % (args.destination_channel, device)
         expiresTime = datetime.datetime.utcnow() + datetime.timedelta(days=1)
+        expiresTime = expiresTime.replace(microsecond=0)
         r = requests.post(
             PUSH_BROADCAST_URL,
-            data=PUSH_DATA % (expiresTime.isoformat(timespec='milliseconds'), pushData),
+            data=PUSH_DATA % (expiresTime.isoformat(), pushData),
             headers={'content-type': 'application/json'})
         if r.status_code != 200:
             print("WARNING: Push notification failed for device '{}' on channel '{}' expiring on '{}' with: \nHTTP {}\n{}\n".format(device, args.destination_channel, expiresTime.isoformat(), r.status_code, r.text))
