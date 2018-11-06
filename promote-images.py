@@ -178,7 +178,7 @@ for device in devices:
     else:
         subprocess.run(cmd, check=False)
         pushData = '{"%s/%s": [0, ""]}' % (args.destination_channel, device)
-        expiresTime = datetime.now() + datetime.timedelta(days=1)
+        expiresTime = datetime.datetime.now() + datetime.timedelta(days=1)
         r = requests.post(
             PUSH_BROADCAST_URL,
             data=PUSH_DATA % (expiresTime.isoformat(), pushData),
