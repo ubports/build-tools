@@ -184,4 +184,4 @@ for device in devices:
             data=PUSH_DATA % (expiresTime.isoformat(), pushData),
             headers={'content-type': 'application/json'})
         if r.status_code != 200:
-            print("WARNING: Push notification failed for device '{}' on channel '{}' expiring on '{}' with: \nHTTP {}\n{}\n".format(device, args.destination_channel, expiresTIme.isoformat(), r.status_code, r.text))
+            print("WARNING: Push notification failed for device '{}' on channel '{}' expiring on '{}' with: \nHTTP {}\n{}\n".format(device, args.destination_channel, expiresTime.isoformat(), r.status_code, r.text))
