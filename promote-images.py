@@ -30,7 +30,7 @@ PUSH_BROADCAST_URL = 'https://push.ubports.com/broadcast'
 PUSH_DATA = '''{
     "channel": "system",
     "expire_on": "%s",
-    "data": "%s"
+    "data": %s
 }'''
 
 
@@ -177,7 +177,7 @@ for device in devices:
         print(cmd)
     else:
         subprocess.run(cmd, check=False)
-        pushData = u'{"%s/%s": [0, ""]}' % (args.destination_channel, device)
+        pushData = '{"%s/%s": [0, ""]}' % (args.destination_channel, device)
         expiresTime = datetime.datetime.now() + datetime.timedelta(days=1)
         r = requests.post(
             PUSH_BROADCAST_URL,
