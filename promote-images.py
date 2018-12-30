@@ -17,10 +17,25 @@
 
 # I promote images!
 
-import argparse, subprocess, os, requests, time
+import argparse
+import datetime
+import os
+import subprocess
+import time
+
+import requests
+
+
+PUSH_BROADCAST_URL = 'https://push.ubports.com/broadcast'
+PUSH_DATA = '''{
+    "channel": "system",
+    "expire_on": "%s",
+    "data": "%s"
+}'''
+
 
 def getLastTag(channel):
-    tag=None
+    tag = None
     index = requests.get("https://system-image.ubports.com/ubports-touch/16.04/%s/bacon/index.json" % channel)
     if not index:
         return tag
@@ -32,6 +47,7 @@ def getLastTag(channel):
                 tag = detail.split("=")[1]
                 break
     return tag
+
 
 def checkGithubLabel(label):
     issuesPayload = {"labels": label, "state": "open"}
@@ -51,6 +67,7 @@ def checkGithubLabel(label):
         exit()
 
     return blocker
+
 
 parser = argparse.ArgumentParser(description='I promote images!')
 parser.add_argument("copy_images_script", metavar="COPY-IMAGES-SCRIPT")
@@ -126,7 +143,7 @@ if args.tag_ota:
             print("last ota version was %s" % last_ota_v)
             if int(args.tag_ota) <= int(last_ota_v):
                 print("Ota version cannot be lower or equal to last version! %s =< %s"
-                            % (args.tag_ota, last_ota_v))
+                      % (args.tag_ota, last_ota_v))
                 exit()
     new_tag = "OTA-%s" % args.tag_ota
 
@@ -148,9 +165,9 @@ else:
     if args.tag:
         copyImageArgs2 += ["-t", str(args.tag)]
 if args.verbose and args.verbose != 0:
-    a="-"
+    a = "-"
     for x in range(0, args.verbose):
-        a+="v"
+        a += "v"
     copyImageArgs2 += [a]
 
 for device in devices:
@@ -160,3 +177,11 @@ for device in devices:
         print(cmd)
     else:
         subprocess.run(cmd, check=False)
+        pushData = '{"{}/{}": [0, ""]}'.format(args.destination_channel, device)
+        expiresTime = datetime.datetime.now() + datetime.timedelta(days=1)
+        r = requests.post(
+            PUSH_BROADCAST_URL,
+            data=PUSH_DATA % (expiresTime.isoformat(), pushData),
+            headers={'content-type': 'application/json'})
+        if r.status_code != 200:
+            print("WARNING: Push notification failed for device '{}' on channel '{}' with: \nHTTP {}\n{}\n".format(device, args.destination_channel, r.status_code, r.text))
