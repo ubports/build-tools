@@ -102,3 +102,6 @@ fi
 if [ -f source/ubports.no_test ]; then
         cp source/ubports.no_test ubports.no_test.buildinfo
 fi
+if [ -f source/ubports.backports ]; then
+        cp source/ubports.backports ubports.backports.buildinfo
+fi

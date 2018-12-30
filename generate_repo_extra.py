@@ -18,9 +18,14 @@
 import requests
 import os
 import sys
+import subprocess
 
 DEB_SOURCE_TEMPLATE = "deb http://repo.ubports.com/ %s main"
 VALID_ARCH = ["armhf", "arm64", "amd64"]
+
+MAIN = "http://archive.ubuntu.com/ubuntu/"
+PORTS = "http://ports.ubuntu.com/ubuntu-ports/"
+BACKPORTS = "deb {} xenial-backports main restricted universe"
 
 
 def repo_exist(repo):
@@ -40,6 +45,16 @@ def get_branch():
 
 def ubports_depends_exist():
     return os.path.isfile("ubports.depends")
+
+
+def enable_backports():
+    return os.path.isfile("ubports.backports.buildinfo")
+
+
+def get_archive():
+    arch = subprocess.check_output(
+        ["dpkg", "--print-architecture"]).decode("utf8").strip()
+    return MAIN if arch == "amd64" or arch == "i386" else PORTS
 
 
 def get_ubports_depends():
@@ -144,6 +159,9 @@ print("Branches %s " % depends_list)
 deb_sources_list = []
 for _depend in depends_list:
     deb_sources_list.append(DEB_SOURCE_TEMPLATE % _depend)
+
+if enable_backports():
+    deb_sources_list.append(BACKPORTS.format(get_archive()))
 
 deb_sources = ",".join(deb_sources_list)
 
