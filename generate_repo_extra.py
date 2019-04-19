@@ -148,6 +148,15 @@ if ubports_depends_exist():
         print("ERROR: get_ubports_depends failed")
         sys.exit(1)
     for _depend in depends_file:
+        if is_extension(_depend):
+            base_extensions = extension_get_repos(_depend)
+            print(base_extensions)
+            for base_extension in base_extensions:
+                if repo_exist(base_extension):
+                    depends_list.append(base_extension)
+                else:
+                    print("ERROR: Extension repo '%s' do not exist" % base_extension)
+                    sys.exit(1)
         if repo_exist(_depend):
             depends_list.append(_depend)
         else:
