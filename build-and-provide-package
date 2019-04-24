@@ -1,0 +1,1185 @@
+#!/bin/bash
+
+if [ -z ${JENKINS_DEBIAN_GLUE_QUIET:-} ]; then
+  set -x
+fi
+set -u
+
+# Debian bug #531885: cowbuilder build fails with restrictive umask
+umask 022
+
+# make sure cowbuilder/pbuilder/... are available
+PATH='/bin:/sbin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin'
+
+# make sure qemu doesn't give us the "out of memory issue" when compiling
+export QEMU_RESERVED_VA=0x0
+
+echo "*** Starting $0 at $(date) ***"
+start_seconds=$(sed -e 's/^\([0-9]*\).*/\1/' < /proc/uptime)
+
+JENKINS_DEBIAN_GLUE_VERSION=$(dpkg --list jenkins-debian-glue 2>/dev/null | awk '/^ii/ {print $3}')
+if [ -n "${JENKINS_DEBIAN_GLUE_VERSION:-}" ] ; then
+  echo "*** Running jenkins-debian-glue version $JENKINS_DEBIAN_GLUE_VERSION ***"
+fi
+
+HOST_ARCH="$(dpkg --print-architecture)"
+if [ -n "${HOST_ARCH:-}" ] ; then
+  echo "*** Identified host architecture ${HOST_ARCH} ***"
+fi
+
+set_debootstrap() {
+  if [ -n "${DEBOOTSTRAP:-}" ] ; then
+    echo "*** Using provided ${DEBOOTSTRAP} as DEBOOTSTRAP ***"
+    return 0
+  fi
+
+  if [ "${architecture:-}" = "${HOST_ARCH:-}" ] || \
+     [ "${architecture:-}" = "all" ] ; then
+    DEBOOTSTRAP="debootstrap"
+    return 0
+  fi
+
+  # we can compile i386 packages on amd64, so don't use qemu-debootstrap there
+  case "$HOST_ARCH" in
+    amd64)
+      if [ "${architecture:-}" = "i386" ] ; then
+        DEBOOTSTRAP="debootstrap"
+        return 0
+      fi
+      ;;
+  esac
+
+  # otherwise assume we're building for a foreign architecture
+  if [ -x "$(which qemu-debootstrap)" ] ; then
+    DEBOOTSTRAP="qemu-debootstrap"
+  else
+    echo "Error: qemu-debootstrap not available, please install qemu-user-static." >&2
+    exit 1
+  fi
+}
+
+checks_and_defaults() {
+  # backwards compatibility, see PR#94
+  if [ -z "${REPOSITORY:-}" ] ; then
+    local repository_is_missing_in_env=true
+  else
+    local repository_is_missing_in_env=false
+  fi
+
+  if [ -r /etc/jenkins/debian_glue ] ; then
+    . /etc/jenkins/debian_glue
+  fi
+
+  # backwards compatibility, see PR#94
+  if [ -n "${REPOSITORY:-}" ] && $repository_is_missing_in_env ; then
+    echo "*** WARNING: 'REPOSITORY' set in /etc/jenkins/debian_glue but should be DEFAULT_REPOSITORY ***"
+    echo "*** WARNING: Setting DEFAULT_REPOSITORY to $REPOSITORY for backwards compatibility ***"
+    echo "*** WARNING: Please replace REPOSITORY=... in /etc/jenkins/debian_glue with DEFAULT_REPOSITORY=... ***"
+    DEFAULT_REPOSITORY="${REPOSITORY}"
+  fi
+
+  # make sure cowbuilder/pbuilder has access to the variable
+  if [ -n "${DEB_KEEP_BUILD_ENV:-}" ] ; then
+    export DEB_KEEP_BUILD_ENV
+  fi
+
+  if [ -z "${JOB_NAME:-}" ] ; then
+    echo "Error: No JOB_NAME defined, please run it in jenkins." >&2
+    exit 1
+  fi
+
+  if [ -z "${architecture:-}" ] ; then
+    echo "*** No architecture defined. Consider running it with matrix configuration. ***"
+    architecture="${HOST_ARCH}"
+    echo "*** Falling back to default, using host architecture ${architecture}. ***"
+  fi
+
+  set_debootstrap
+
+  if [ -z "${REPREPRO_OPTS:-}" ] ; then
+    REPREPRO_OPTS='-v --waitforlock 1000'
+    echo "*** REPREPRO_OPTS is unset, using default: $REPREPRO_OPTS ***"
+  fi
+
+  # support usage of a reprepro wrapper
+  REPREPRO_CMD="${REPREPRO_CMD:-reprepro}"
+
+  if [ -z "${DEFAULT_REPOSITORY:-}" ] ; then
+    DEFAULT_REPOSITORY='/srv/repository'
+  fi
+
+  # REPOSITORY can overwrite DEFAULT_REPOSITORY, so define only if unset
+  if [ -z "${REPOSITORY:-}" ] ; then
+    REPOSITORY="${DEFAULT_REPOSITORY}"
+  fi
+
+  if [ -z "${PBUILDER_HOOKDIR:-}" ] ; then
+    PBUILDER_HOOKDIR='/usr/share/jenkins-debian-glue/pbuilder-hookdir/'
+  fi
+
+  # Evaluate Freight default options - we use the system wide freight
+  # directories and configuration, unless either $FREIGHT_REPOSITORY or
+  # $FREIGHT_BASE are specified.
+  if [ -z "${FREIGHT_REPOSITORY:-}" ] && [ -z "${FREIGHT_BASE:-}" ] ; then
+    FREIGHT_VARLIB=/var/lib/freight
+    FREIGHT_VARCACHE=/var/cache/freight
+    FREIGHT_CONF=/etc/freight.conf
+  elif [ -z "${FREIGHT_REPOSITORY:-}" ] && [ -n "${FREIGHT_BASE:-}" ] ; then
+    FREIGHT_VARLIB=${FREIGHT_BASE}/default-source
+    FREIGHT_VARCACHE=${FREIGHT_BASE}/default
+    FREIGHT_CONF=${FREIGHT_BASE}/default.conf
+  else
+    # Default to /srv/freight unless specifed
+    if [ -z "${FREIGHT_BASE:-}" ] ; then
+      FREIGHT_BASE=/srv/freight
+    fi
+
+    FREIGHT_VARLIB=${FREIGHT_BASE}/${FREIGHT_REPOSITORY}-source
+    FREIGHT_VARCACHE=${FREIGHT_BASE}/${FREIGHT_REPOSITORY}
+    FREIGHT_CONF=${FREIGHT_BASE}/${FREIGHT_REPOSITORY}.conf
+  fi
+}
+
+clean_workspace() {
+  echo "*** The following files have been noticed in the workspace [$(pwd)]: ***"
+  ls -la ./
+
+#  echo "*** Cleaning workspace in $(pwd) to make sure we're building from scratch. ***"
+#  rm -f ./* || true
+}
+
+# make sure we don't leave files for next run
+bailout() {
+  [ -n "${1:-}" ] && EXIT="${1}" || EXIT=0
+  [ -n "${2:-}" ] && echo "$2" >&2
+
+  rm -f "${build_lockfile}"
+  # if we have an aborted build we have to clean up left behinds,
+  # but we have to make sure we only clean up the files from our run
+  if [ -r "${update_lockfile_pid}" ] ; then
+    rm -f "${update_lockfile_pid}"
+    rm -f "${update_lockfile}"
+  fi
+
+  if [ "${SKIP_BINARY_REMOVAL:-}" = "true" ] ; then
+    echo "*** Skipping binary removal as requested via SKIP_BINARY_REMOVAL=true. ***"
+  else
+    echo "*** Getting rid of files in $WORKSPACE/binaries/ to avoid problems in next run. ***"
+    rm -f "$WORKSPACE"/binaries/*
+  fi
+
+  [ -n "${pbuilderrc:-}" ] && rm -rf "${pbuilderrc}"
+
+  [ -n "${tmpaptdir:-}" ] && ${SUDO_CMD:-} rm -rf "${tmpaptdir}"
+
+  [ -n "$start_seconds" ] && SECONDS="$[$(sed -e 's/^\([0-9]*\).*/\1/' < /proc/uptime)-$start_seconds]" || SECONDS="unknown"
+  echo "*** Finished execution of $0 at $(date) [running ${SECONDS} seconds] ***"
+
+  exit $EXIT
+}
+
+identify_package_name() {
+  # make sure we get rid of 'repos' and 'binaries' from Jenkins job name
+  PACKAGE=${JOB_NAME%-repos*}
+  PACKAGE=${PACKAGE%-binaries*}
+
+  if [ -n "${PACKAGE:-}" ] ; then
+    echo "*** Identified Debian package name $PACKAGE ***"
+  else
+    bailout 1 "Error: could not identify Debian package name based on job name ${JOB_NAME:-}."
+  fi
+}
+
+set_base_path() {
+  # when BASE_PATH is set in the build step then don't default to $WORKSPACE
+  if [ -n "${BASE_PATH:-}" ] ; then
+    echo "*** Using provided ${BASE_PATH} as BASE_PATH ***"
+  else
+    BASE_PATH="${WORKSPACE}"
+    echo "*** Using \$WORKSPACE [$BASE_PATH] as default for BASE_PATH ***"
+  fi
+
+}
+
+build_info() {
+  if [ -n "${REPOS:-}" ] ; then
+    echo "*** Using supplied repository name $REPOS ***"
+  else
+    REPOS="${JOB_NAME%-binaries*}"
+    REPOS="${REPOS%-repos*}"
+
+    if [ -z "${distribution:-}" ]; then
+      echo "*** No repository supplied, using repository name $REPOS ***"
+    else
+      REPOS="${REPOS}-${distribution}"
+      echo "*** No repository supplied but distribution has been set, using repository name $REPOS ***"
+    fi
+  fi
+}
+
+identify_sourcefile() {
+  if [ -n "${sources:-}" ] ; then
+    echo "*** WARNING: sources variable [$sources] is set, please use BASE_PATH variable instead ***"
+    echo "*** If \$sources is unrelated to build-and-provide-package you can ignore this warning ***"
+  fi
+
+  echo "*** Identifying newest package version ***"
+  newest_version=''
+
+  for file in "${BASE_PATH}/"*.dsc ; do
+    SOURCE_PACKAGE="$(awk '/^Source: / {print $2}' $file)"
+    p="$(basename $file .dsc)"
+    if [ "$p" = '*' ] ; then
+      bailout 1 "Error: No source package found (forgot to configure source files deployment?)"
+    fi
+    cur_version="${p#*_}"
+    if [ -z "${newest_version}" ] || dpkg --compare-versions "${cur_version}" gt "${newest_version}" ; then
+      newest_version="${cur_version}"
+    fi
+  done
+
+  echo "*** Found package version $newest_version ***"
+
+  sourcefile="${BASE_PATH}/${SOURCE_PACKAGE}"_*"${newest_version}".dsc
+
+  echo "*** Using $sourcefile (version: ${newest_version})"
+}
+
+dist_and_arch_settings() {
+  if [ -z "${architecture:-}" ] || [ "${architecture:-}" = "all" ] ; then
+    arch="${HOST_ARCH}"
+    echo "*** No architecture set or architecture set to 'all', using system arch ${arch} ***"
+  else
+    arch="${architecture}"
+    echo "*** architecture is set to ${architecture} ***"
+  fi
+
+  if [ -n "${distribution:-}" ] ; then
+    local DIST="${distribution}"
+  else
+    # default to the currently running distribution to avoid hardcoding
+    # a distribution which might not be supported by the running system
+    local distribution=$(lsb_release --short --codename 2>/dev/null)
+    [ -n "${distribution}" ] || distribution="sid"  # fallback to "sid" iff lsb_release fails
+    local DIST="$distribution"
+  fi
+
+  # if COWBUILDER_DIST is set it overrides distribution then
+  if [ -n "${COWBUILDER_DIST:-}" ]; then
+    echo "*** COWBUILDER_DIST is set to $COWBUILDER_DIST - using it for base.cow if it does not exist yet. ***"
+  else
+    echo "*** Using cowbuilder base for distribution ${DIST} ***"
+    COWBUILDER_DIST="${DIST}"
+  fi
+
+  if [ -n "${COWBUILDER_BASE:-}" ] ; then
+    echo "*** COWBUILDER_BASE is set to $COWBUILDER_BASE - using as cowbuilder base.cow ***"
+  else
+    COWBUILDER_BASE="/var/cache/pbuilder/base-${COWBUILDER_DIST}-${arch}.cow"
+    echo "*** No COWBUILDER_BASE set, using $COWBUILDER_BASE as cowbuilder base.cow ***"
+  fi
+
+  local lockfiles="/var/run/lock/${COWBUILDER_DIST}-${arch}"
+  build_lockfile="${lockfiles}.building.$$"
+  update_lockfile="${lockfiles}.update"
+  update_lockfile_pid="${lockfiles}.update.$$"
+}
+
+cowbuilder_init() {
+
+  pbuilderrc=$(mktemp)
+  echo "# pbuilder config file generated by jenkins-debian-glue on $(date)" > "$pbuilderrc"
+
+  # allow pbuilder networking
+  if [ -n "${PBUILDER_USENETWORK:-}" ] ; then
+    echo "USENETWORK=yes" >> "$pbuilderrc"
+  fi
+
+  use_eatmydata
+  use_ccache
+
+  # allow setting main pbuilder configuration file from outside, then append data
+  # as needed without actually writing anything to user-provided $PBUILDER_CONFIG
+  if [ -n "${PBUILDER_CONFIG:-}" ] ; then
+    echo "*** PBUILDER_CONFIG is set, considering $PBUILDER_CONFIG for pbuilder config ***"
+    if [ -r "${PBUILDER_CONFIG:-}" ] ; then
+      echo "*** Adding content of $PBUILDER_CONFIG to pbuilder configfile ***"
+      echo "# $PBUILDER_CONFIG added via jenkins-debian-glue:" >> "$pbuilderrc"
+      cat $PBUILDER_CONFIG >> "$pbuilderrc"
+    else
+      echo "*** WARNING: File $PBUILDER_CONFIG could not be read, ignoring ***"
+    fi
+  fi
+
+  if [ -n "${COMPONENTS:-}" ] ; then
+    echo "*** COMPONENTS is set [$COMPONENTS], using for pbuilder configuration ***"
+    echo "# COMPONENTS set by jenkins-debian-glue:" >> "$pbuilderrc"
+    echo "COMPONENTS=\"${COMPONENTS}\"" >> "$pbuilderrc"
+  else
+    # workaround for Ubuntu problem, as cowdancer is available only in universe :(
+    # https://bugs.launchpad.net/ubuntu/+source/cowdancer/+bug/237591
+    # https://bugs.launchpad.net/ubuntu/+source/cowdancer/+bug/747053
+    echo "*** COMPONENTS is not set, checking whether we need to enable Ubuntu workaround ***"
+
+    if [ -n "${PBUILDER_CONFIG:-}" ] ; then
+      echo "*** PBUILDER_CONFIG is set, not overwriting COMPONENTS for Ubuntu workaround ***"
+      echo "*** NOTE: If you want to build for Ubuntu make sure COMPONENTS also includes 'universe' ***"
+    else
+      echo "*** PBUILDER_CONFIG is not set, continuing with checks for Ubuntu workaround ***"
+
+      if ! [ -r "/usr/share/debootstrap/scripts/${COWBUILDER_DIST}" ] ; then
+        echo "*** WARNING: distribution ${COWBUILDER_DIST} not supported by debootstrap, not considering Ubuntu workaround ***"
+      else
+        # debootstrap scripts for recent versions of Ubuntu are all pointing to gutsy, use that
+        # to identify Ubuntu as the distribution we want to build instead of hardcoding all
+        # the Ubuntu release names here
+        if [ "$(readlink -f /usr/share/debootstrap/scripts/${COWBUILDER_DIST})" != '/usr/share/debootstrap/scripts/gutsy' ] ; then
+          echo "*** Doesn't look like we're building for Ubuntu, not considering Ubuntu workaround ***"
+        else
+          echo "*** Building for Ubuntu detected, enabling universe repository component to work around cowdancer issue ***"
+          echo "# Building for Ubuntu detected, enabling universe repository component to work around cowdancer issue:" >> "$pbuilderrc"
+          echo 'COMPONENTS="main universe"' >> "$pbuilderrc"
+        fi
+      fi
+    fi
+  fi
+
+  # ensure that we've access to Debian's archive keyring if we're
+  # building for recent Debian releases on Ubuntu, see issue#130
+  if lsb_release --id 2>/dev/null | grep -q Ubuntu ; then
+    echo "*** Looks like we're building on Ubuntu, checking for distribution target ***"
+    if [ "$(readlink -f /usr/share/debootstrap/scripts/${COWBUILDER_DIST})" != '/usr/share/debootstrap/scripts/sid' ] ; then
+      echo "*** Doesn't look like we're building for Debian, not considering Debian archive keyring workaround ***"
+    else
+      if ! [ -r /usr/share/keyrings/debian-archive-keyring.gpg ] ; then
+        echo "*** WARNING: /usr/share/keyrings/debian-archive-keyring.gpg does not exist. ***"
+        echo "*** If building fails with 'E: Release signed by unknown key ...' please ensure package debian-archive-keyring is installed ***"
+      else
+        echo "*** Package debian-archive-keyring is present, enabling its usage for keyring ***"
+        echo "DEBOOTSTRAPOPTS=(${DEBOOTSTRAPOPTS[@]:-} '--keyring' '/usr/share/keyrings/debian-archive-keyring.gpg' )" >> "$pbuilderrc"
+      fi
+    fi
+  fi
+
+  echo "*** Listing pbuilder configuration file as reference: ***"
+  cat "$pbuilderrc"
+
+  if ls "${COWBUILDER_BASE}.building."* >/dev/null 2>&1 ; then
+    echo "*** Skipping update run because a build is in progress ***"
+    return 0
+  fi
+
+  if ls "${update_lockfile}"* >/dev/null 2>&1 ; then
+    echo "*** Update run already taking place, skipping ***"
+    return 0
+  fi
+
+  (
+  # if we cannot get the lock then somebody else is already running
+  if ! flock --nonblock 9 ; then
+    exit 1
+  fi
+
+  # in order to be able to clean up aborted runs we need to
+  # mark that this file is ours
+  touch "${update_lockfile_pid}"
+
+  if [ ! -d "${COWBUILDER_BASE}" ]; then
+    echo "*** Creating cowbuilder base $COWBUILDER_BASE for arch $arch and distribution $COWBUILDER_DIST ***"
+    sudo DIST="${distribution:-}" ARCH="${architecture:-}" ${ADT:+ADT=$ADT} \
+      cowbuilder --create --basepath "${COWBUILDER_BASE}" --distribution "${COWBUILDER_DIST}" \
+         --debootstrap "${DEBOOTSTRAP}" --architecture "${architecture:-}" \
+         --debootstrapopts --arch --debootstrapopts "$arch" \
+         --debootstrapopts --variant=buildd --configfile="${pbuilderrc}" \
+         --hookdir "${PBUILDER_HOOKDIR}"
+    [ $? -eq 0 ] || exit 2
+  else
+    if [ "${SKIP_COWBUILDER_UPDATE:-}" = "true" ] ; then
+      echo "*** Skipping cowbuilder update as requested via SKIP_COWBUILDER_UPDATE ***"
+    else
+      echo "*** Updating cowbuilder cow base ***"
+      sudo DIST="${distribution:-}" ARCH="${architecture:-}" ${ADT:+ADT=$ADT} \
+        cowbuilder --update --basepath "${COWBUILDER_BASE}" --configfile="${pbuilderrc}"
+      [ $? -eq 0 ] || exit 3
+    fi
+  fi
+  ) 9>"${update_lockfile}" ||
+    {
+      # depending on the exit code we have to distinguish between different failures
+      case "$?" in
+        1)
+          echo "*** Someone else is holding the lock file ${update_lockfile}, skipping create/update ***"
+          return 0
+          ;;
+        2)
+          echo "*** Something went wrong with the creation of the cowbuilder environment. Cleaning up. ***"
+          rm -rf "${COWBUILDER_BASE}"
+          bailout 1 "Error: Failed to create cowbuilder base ${COWBUILDER_BASE}."
+          ;;
+        3)
+          bailout 1 "Error: Failed to update cowbuilder base ${COWBUILDER_BASE}."
+          ;;
+      esac
+  }
+
+  rm -f "${update_lockfile_pid}" "${update_lockfile}"
+}
+
+
+identify_build_type() {
+  if [ -n "${DEBBUILDOPTS:-}" ] ; then
+    echo "*** Using provided ${DEBBUILDOPTS} as DEBBUILDOPTS ***"
+    echo "*** Please don't forget to set SKIP_ARCH_BUILD={true,false} as needed ***"
+    return 0
+  fi
+
+  # also support 'export FORCE_BINARY_ONLY=$label' use case with builds
+  if [ -z "${FORCE_BINARY_ONLY:-}" ] ; then
+    echo "*** FORCE_BINARY_ONLY is unset, continuing with checks for build type ***"
+  else
+    echo "*** FORCE_BINARY_ONLY is set to ${FORCE_BINARY_ONLY} ***"
+    case "${FORCE_BINARY_ONLY}" in
+      all)
+        DEBBUILDOPTS="-A"
+        echo "*** FORCE_BINARY_ONLY set to 'all', building with DEBBUILDOPTS=${DEBBUILDOPTS} ***"
+        ;;
+      *)
+        DEBBUILDOPTS="-B"
+        echo "*** FORCE_BINARY_ONLY is NOT set to 'all', building with DEBBUILDOPTS=${DEBBUILDOPTS} ***"
+        ;;
+    esac
+
+    SKIP_ARCH_BUILD=false
+    echo "*** Setting SKIP_ARCH_BUILD=$SKIP_ARCH_BUILD to skip further arch builds. ***"
+
+    SKIP_SOURCE_REMOVAL=true
+    echo "*** Setting SKIP_SOURCE_REMOVAL=$SKIP_SOURCE_REMOVAL to skip source removal in binary only build ***"
+    return 0
+  fi
+
+  # defaults
+  DEBBUILDOPTS="-sa"
+  SKIP_ARCH_BUILD=false
+
+  if [ "${architecture:-}" = "all" ] ; then
+    echo "*** \$architecture is set to 'all', skipping further identify_build_type checks. ***"
+    echo "*** Consider setting \$architecture to amd64, i386,... instead. ***"
+    return 0
+  fi
+
+  if [ -z "${MAIN_ARCHITECTURE:-}" ] ; then
+    if [ "${HOST_ARCH}" = "${architecture:-}" ] ; then
+      echo "*** MAIN_ARCHITECTURE is unset. ***"
+      echo "*** Host architecture [${HOST_ARCH}] matches \$architecture [${architecture:-}], using default ${DEBBUILDOPTS:-} buildoption ***"
+      return 0
+    else
+      echo "*** MAIN_ARCHITECTURE is unset. ***"
+      echo "*** Host architecture [${HOST_ARCH}] does not match \$architecture [${architecture:-}] ... ***"
+      echo "*** ... setting binary only build and continuing with identify_build_type ***"
+      DEBBUILDOPTS="-B"
+
+      SKIP_SOURCE_REMOVAL=true
+      echo "*** Setting SKIP_SOURCE_REMOVAL=$SKIP_SOURCE_REMOVAL to skip source removal in binary only build ***"
+    fi
+  else
+    if [ "${MAIN_ARCHITECTURE:-}" = "${architecture:-}" ] ;then
+      echo "*** MAIN_ARCHITECTURE is set [${MAIN_ARCHITECTURE:-}]. ***"
+      echo "*** MAIN_ARCHITECTURE matches \$architecture [${architecture:-}], using default ${DEBBUILDOPTS:-} buildoption ***"
+      return 0
+    else
+      echo "*** MAIN_ARCHITECTURE [${MAIN_ARCHITECTURE:-}] does not match \$architecture [${architecture:-}], setting binary only build and continuing with identify_build_type ***"
+      DEBBUILDOPTS="-B"
+
+      SKIP_SOURCE_REMOVAL=true
+      echo "*** Setting SKIP_SOURCE_REMOVAL=$SKIP_SOURCE_REMOVAL to skip source removal in binary only build ***"
+    fi
+  fi
+
+  local TMPDIR=$(mktemp -d)
+  local old_dir=$(pwd)
+  cd "$TMPDIR"
+  for file in  ${BASE_PATH}/${SOURCE_PACKAGE}_*.tar.* ; do
+    if tar atf "$file" 2>/dev/null | egrep -q 'debian/control' ; then
+      # might be source/debian/control - so let's identify the path to debian/control
+      local control_file=$(tar atf "$file" 2>/dev/null | egrep 'debian/control')
+      tar axf "$file" "$control_file" || bailout 1 "Error while looking at debian/control in source archive."
+
+      if grep -q '^Architecture: all' "$control_file" ; then
+        if grep -q '^Architecture: .*any' "$control_file" ; then
+          echo "*** Package provides arch 'all' + 'any', enabling -B buildoption for this architecture. ***"
+          # -B -> binary-only build, limited to architecture dependent packages
+          DEBBUILDOPTS="-B"
+
+          SKIP_SOURCE_REMOVAL=true
+          echo "*** Setting SKIP_SOURCE_REMOVAL=$SKIP_SOURCE_REMOVAL to skip source removal in binary only build ***"
+          break
+        else
+          # only "Architecture: all", so no arch specific packages since
+          # we aren't building for $MAIN_ARCHITECTURE
+          SKIP_ARCH_BUILD=true
+          break
+        fi
+      fi
+    fi
+  done
+  cd "$old_dir"
+  rm -rf "${TMPDIR}"
+}
+
+autopkg_run() {
+  case "${ADT:-}" in
+    skip)
+      echo "*** Skipping external autopkgtests as ADT is set to 'skip' ***"
+      return 0
+      ;;
+    internal)
+      echo "*** Skipping external autopkgtests as ADT is set to 'internal' ***"
+      return 0
+      ;;
+    external|all)
+      echo "*** Executing external autopkgtests as ADT is set to $ADT ***"
+      ;;
+    *)
+      echo "*** Skipping external autopkgtests as ADT is neither set to 'external' nor 'all' ***"
+      return 0
+      ;;
+  esac
+
+  if [ -z "${ADT_RUNNER:-}" ] ; then
+    bailout 1 "*** Error: ADT_RUNNER is unset, external autopkgtests depend on according ADT_RUNNER configuration ***"
+  fi
+
+  dsc_file="${WORKSPACE}/"*"_${newest_version}.dsc"
+  if ! grep -q '^Testsuite: autopkgtest' ${dsc_file} ; then
+    echo "*** No 'Testsuite: autopkgtest' present in ${dsc_file}, skipping external autopkgtests ***"
+    return 0
+  fi
+
+  if [ -n "${ADT_OPTIONS:-}" ] ; then
+    echo "*** Using provided ADT_OPTIONS $ADT_OPTIONS ***"
+  else
+    # since autopkgtest 3.16 the --tmp-dir option is gone, make sure
+    # we've --output-dir available though before using it
+    if adt-run --help | grep -q -- --output-dir 2>/dev/null ; then
+      local adt_output_option='--output-dir'
+    else
+      local adt_output_option='--tmp-dir'
+    fi
+
+    ADT_OPTIONS="$adt_output_option adt-external/out --summary adt-external/summary"
+    rm -rf adt-external
+    mkdir -p adt-external
+    echo "*** Using default ADT_OPTIONS $ADT_OPTIONS ***"
+  fi
+
+  changes_file="${WORKSPACE}/"*"_${newest_version}_${arch}.changes"
+  echo "*** Executing 'adt-run --changes $changes_file ${ADT_OPTIONS:-} --- $ADT_RUNNER' ***"
+  adt-run --changes $changes_file ${ADT_OPTIONS:-} --- $ADT_RUNNER || bailout $?
+}
+
+use_ccache() {
+  if [ "${USE_CCACHE:-}" = 'true' ] ; then
+    echo "*** USE_CCACHE is set to true, enabling ccache support ***"
+    echo 'CCACHEDIR="/var/cache/pbuilder/ccache"' >> "$pbuilderrc"
+  fi
+}
+
+enable_eatmydata() {
+  echo 'EXTRAPACKAGES="$EXTRAPACKAGES eatmydata"' >> "$pbuilderrc"
+  echo 'export LD_PRELOAD="${LD_PRELOAD:+$LD_PRELOAD:}libeatmydata.so"' >> "$pbuilderrc"
+  echo '# builtin support available with pbuilder >=0.225 (otherwise ignored):' >> "$pbuilderrc"
+  echo 'EATMYDATA=yes' >> "$pbuilderrc"
+}
+
+use_eatmydata() {
+  if [ "${USE_EATMYDATA:-}" = 'false' ] ; then
+    echo "*** eatmydata is disabled via USE_EATMYDATA [$USE_EATMYDATA] ***"
+    return 0
+  fi
+
+  if [ "${USE_EATMYDATA:-}" = 'true' ] ; then
+    echo "*** eatmydata is enabled via USE_EATMYDATA [$USE_EATMYDATA], forcing usage (skipping host/distribution checks) ***"
+    enable_eatmydata
+  else
+    if ! dpkg-query --show --showformat='${Status}' eatmydata | grep -q '^install' ; then
+      echo "*** eatmydata missing on host system, not considering for usage (force via USE_EATMYDATA=true) ***"
+    else
+      if ! dpkg --compare-versions "$(dpkg-query --show --showformat='${Version}' eatmydata)" gt '26-2' ; then
+        echo "*** eatmydata version on host needs to be newer than v26-2 (>=82-6 is recommended), skipping eatmydata ***"
+      else
+        echo "*** eatmydata is present on host system, now checking distribution support ***"
+        case "${COWBUILDER_DIST}" in
+          etch|lenny|squeeze|wheezy)
+            echo "*** Debian release $COWBUILDER_DIST doesn't provide eatmydata >=82-6, skipping eatmydata ***"
+            ;;
+          warty|hoary|breezy|dapper|edgy|feisty|gutsy|hardy|intrepid|jaunty|karmi|lucid|maverick|natty|oneiric|quantal|raring|saucy|utopic|precise|trusty)
+            echo "*** Ubuntu release $COWBUILDER_DIST doesn't provide eatmydata >=82-6, skipping eatmydata ***"
+            ;;
+          *)
+            echo "*** Distribution ${COWBUILDER_DIST} should provide recent eatmydata support, enabling eatmydata ***"
+            enable_eatmydata
+            ;;
+        esac
+      fi
+    fi
+  fi
+}
+
+autopkgtest_results() {
+  if [ -n "${SKIP_AUTOPKGTEST_RESULTS:-}" ] ; then
+    echo "** Skipping autopkgtest_results as requested via SKIP_AUTOPKGTEST_RESULTS ***"
+    return 0
+  fi
+
+  mkdir -p adt
+  if [ -r autopkgtest.summary ] ; then
+    mv autopkgtest.summary adt/summary
+  else # do not fail if no autopkgtest run took place
+    touch adt/summary
+  fi
+}
+
+cowbuilder_run() {
+  echo "*** cowbuilder build phase for arch $architecture ***"
+  tmpaptdir=$(mktemp -d /tmp/apt-jdg_XXXXXX)
+  mkdir -p "$WORKSPACE"/binaries/ "${tmpaptdir}"
+
+  local BINDMOUNTS="${tmpaptdir} ${USER_BINDMOUNTS:-}"
+
+  # make sure we build arch specific packages only when necessary
+  identify_build_type
+
+  if $SKIP_ARCH_BUILD ; then
+    autopkgtest_results
+    bailout 0 "Nothing to do, architecture all binary packages only for non-primary architecture."
+  fi
+
+  # For release builds use release repo to satisfy dependencies
+  if [ -n "${release:-}" ] && [ "$release" != "none" ] && [ "$release" != "trunk" ] && \
+    [ "${release}" != '${release}' ] ; then
+    if [ -n "${RELEASE_REPOSITORY:-}" ]; then
+      local REPOSITORY="${RELEASE_REPOSITORY}"
+    else
+      local REPOSITORY="${REPOSITORY}/release/${release}"
+    fi;
+
+    if [ -d "${REPOSITORY}/dists/${release}" ]; then
+      BINDMOUNTS="$BINDMOUNTS $REPOSITORY"
+      local components="$(awk -F': ' '/^Components:/ { print $2 }' \
+        "${REPOSITORY}/dists/${release}/Release")"
+      # Check if keyring is provided so the repository can be verified.
+      if [ -n "${REPOSITORY_KEYRING:-}" ]; then
+        local trusted=
+      else
+        # If no keyring is provided, just assume that the repository is
+        # trustworthy. This option appeared in apt 0.8.16~exp3 which is not
+        # available in Squeeze.
+        local trusted="[trusted=yes]"
+      fi
+      cat > "${tmpaptdir}"/release.list <<EOF
+deb ${trusted} file://${REPOSITORY} ${release} ${components}
+EOF
+    fi
+
+    if [ -n "${REPOSITORY_KEYRING:-}" ]; then
+      cp -a "${REPOSITORY_KEYRING}" "${tmpaptdir}"/keyring.gpg
+    fi
+  fi
+
+  # Adding extra repository for resolving dependencies
+  if [ -n "${REPOSITORY_EXTRA:-}" ]; then
+    echo ${REPOSITORY_EXTRA} | tr ',' '\n' > "${tmpaptdir}"/extra.list
+  fi
+
+  if [ -n "${REPOSITORY_EXTRA_KEYS:-}" ]; then
+    OIFS="$IFS"
+    IFS=',' read -a array <<< "${REPOSITORY_EXTRA_KEYS}"
+    for key in "${array[@]}" ; do
+      curl -O "${key}"
+      gpg --no-default-keyring --keyring "${tmpaptdir}"/keyring.gpg --import "${key##*/}"
+    done
+    unset key
+    IFS="$OIFS"
+  fi
+
+  echo "# pbuilder config file generated by jenkins-debian-glue on $(date)" > "$pbuilderrc"
+
+  # allow pbuilder networking
+  if [ -n "${PBUILDER_USENETWORK:-}" ] ; then
+    echo "USENETWORK=yes" >> "$pbuilderrc"
+  fi
+
+  use_eatmydata
+  use_ccache
+
+  # allow setting main pbuilder configuration file from outside, then append data
+  # as needed without actually writing anything to user-provided $PBUILDER_CONFIG
+  if [ -n "${PBUILDER_CONFIG:-}" ] ; then
+    echo "*** PBUILDER_CONFIG is set, considering $PBUILDER_CONFIG for pbuilder config ***"
+    if [ -r "${PBUILDER_CONFIG:-}" ] ; then
+      echo "*** Adding content of $PBUILDER_CONFIG to pbuilder configfile ***"
+      cat $PBUILDER_CONFIG >> "$pbuilderrc"
+    else
+      echo "*** File $PBUILDER_CONFIG could not be read, ignoring ***"
+    fi
+  fi
+
+  counter=3600
+  while ls "${update_lockfile}."* >/dev/null 2>&1 && [ $counter -gt 0 ] ; do
+    echo "*** Update (or creation) of ${COWBUILDER_BASE} is in progress, waiting up to $counter seconds ***"
+    sleep 1
+    counter=$(( counter - 1 ))
+  done
+
+  if [ $counter -eq 0 ] ; then
+    bailout 1 "Error: ran into timeout because parallel create/update operation for ${COWBUILDER_BASE} didn't finish in time."
+  fi
+
+  touch "${build_lockfile}"
+
+  case "$architecture" in
+    i386)
+      linux32 sudo DIST="${distribution:-}" ARCH="${architecture:-}" ${ADT:+ADT=$ADT} \
+        cowbuilder --buildresult "$WORKSPACE"/binaries/ \
+        --build $sourcefile \
+        --basepath "${COWBUILDER_BASE}" --debbuildopts "${DEBBUILDOPTS:-} -j$(nproc)" \
+        --hookdir "${PBUILDER_HOOKDIR}" --bindmounts "$BINDMOUNTS" --configfile="${pbuilderrc}"
+      [ $? -eq 0 ] || bailout 1 "Error: Failed to build with cowbuilder."
+      ;;
+    amd64|all|*)
+      sudo DIST="${distribution:-}" ARCH="${architecture:-}" ${ADT:+ADT=$ADT} \
+        cowbuilder --buildresult "$WORKSPACE"/binaries/ \
+        --build $sourcefile \
+        --basepath "${COWBUILDER_BASE}" --debbuildopts "${DEBBUILDOPTS:-} -j$(nproc)" \
+        --hookdir "${PBUILDER_HOOKDIR}" --bindmounts "$BINDMOUNTS" --configfile="${pbuilderrc}"
+      [ $? -eq 0 ] || bailout 1 "Error: Failed to build with cowbuilder."
+      ;;
+    *)
+      bailout 1 "Error: Unsupported architecture: $architecture"
+      ;;
+  esac
+
+  rm -f "${build_lockfile}"
+}
+
+# replacement for dcmd, sadly available only in the devscripts package
+list_deb_files() {
+  if [ "$#" -lt 1 ] ; then
+    echo "Error: list_deb_files function needs a file name as argument." >&2
+    return 1
+  fi
+
+  local files
+
+  for arg in "$@" ; do
+    if ! [ -r "$arg" ] ; then
+      echo "Error: could not read $arg" >&2
+      continue
+    fi
+
+    # cmdline based on usage in dcmd, we're interested only in .deb files though
+    sed --regexp-extended -n 's,^ [0-9a-f]{32} [0-9]+ ((([a-zA-Z0-9_.-]+/)?[a-zA-Z0-9_.-]+|-) ([a-zA-Z]+|-) )?(.*.deb)$,\5,p' "$arg"
+  done
+}
+
+remove_packages() {
+  if [ -n "${SKIP_REMOVAL:-}" ] ; then
+    echo "*** Skipping removal of existing packages as requested via SKIP_REMOVAL ***"
+    return 0
+  fi
+
+  if [ -n "${SKIP_SOURCE_REMOVAL:-}" ] ; then
+    echo "*** Skipping removal of existing source package as requested via SKIP_SOURCE_REMOVAL ***"
+  else
+    echo "*** Removing source package version from repository ***"
+    ${SUDO_CMD:-} ${REPREPRO_CMD} -A source -b "${REPOSITORY}" ${REPREPRO_OPTS} remove "${REPOS}" "${SOURCE_PACKAGE}"
+  fi
+
+  echo "*** Removing previous binary package versions from repository ***"
+  for p in $(list_deb_files "${WORKSPACE}/binaries/"*"_${newest_version}_${arch}.changes") ; do
+    file="$(basename $p)"
+    binpackage="${file%%_*}"
+    binary_list="${binary_list:-} ${binpackage}"
+
+    skip=false # don't skip any package(s) unless it's listed in SKIP_PACKAGE_FROM_REMOVAL
+
+    if [ -n "${SKIP_PACKAGE_FROM_REMOVAL:-}" ] ; then
+      echo "*** SKIP_PACKAGE_FROM_REMOVAL is set [${SKIP_PACKAGE_FROM_REMOVAL}]"
+      for package in $SKIP_PACKAGE_FROM_REMOVAL ; do
+        if echo "${package}" | grep -q "${binpackage}" ; then
+          skip=true
+        fi
+      done
+    fi
+
+    if $skip ; then
+      echo "*** Package '$binpackage' listed in SKIP_PACKAGE_FROM_REMOVAL - skipping removal therefore ***"
+    elif echo "$file" | egrep -q '_all.u?deb$'; then
+      # note: "removesrc" would remove foreign arch files (of different builds)
+      echo "*** Removing existing package ${binpackage} from repository ${REPOS} (arch all) ***"
+      ${SUDO_CMD:-} ${REPREPRO_CMD} -b "${REPOSITORY}" ${REPREPRO_OPTS} remove "${REPOS}" "${binpackage}"
+    else
+      echo "*** Removing existing package ${binpackage} from repository ${REPOS} for arch ${arch} ***"
+      ${SUDO_CMD:-} ${REPREPRO_CMD} -A "${arch}" -b "${REPOSITORY}" ${REPREPRO_OPTS} remove "${REPOS}" "${binpackage}"
+    fi
+
+  done
+
+}
+
+remove_missing_binary_packages() {
+  if [ -n "${SKIP_MISSING_BINARY_REMOVAL:-${SKIP_REMOVAL:-}}" ] ; then
+    echo "*** Skipping removal of existing packages as requested via SKIP_MISSING_BINARY_REMOVAL or SKIP_REMOVAL ***"
+    return 0
+  fi
+
+  echo "*** Checking for missing binary packages to be considered for removal ***"
+
+  # In a binary-only build we don't get any arch-all (*_all.deb) packages and
+  # therefore they won't be listed in the changes file.  As a result they would
+  # be reported as missing from the build and to be considered for removal.
+  # As we don't want to remove the arch-all package e.g. from the amd64 repos
+  # in the i386 run we've to skip the removal procedure then.
+  case "${DEBBUILDOPTS:-}" in
+    *-B*)
+      echo "*** Skipping removal of missing binaries as being a binary-only build ***"
+      return 0
+      ;;
+  esac
+
+  for p in $(${SUDO_CMD:-} ${REPREPRO_CMD} -b "${REPOSITORY}" ${REPREPRO_OPTS} --list-format '${package}\n' listmatched "${REPOS}" '*' | sort -u); do
+    echo " $binary_list " | grep -q " $p " || missing_packages="${missing_packages:-} $p"
+  done
+
+  if echo "${missing_packages:-}" | grep -q '.' ; then
+    echo "*** Binary package(s) found, missing in build version: ${missing_packages:-} ***"
+
+    for p in $missing_packages ; do
+      skip=false # don't skip any package(s) unless it's listed in SKIP_PACKAGE_FROM_REMOVAL
+
+      if [ -n "${SKIP_PACKAGE_FROM_REMOVAL:-}" ] ; then
+        echo "*** SKIP_PACKAGE_FROM_REMOVAL is set [${SKIP_PACKAGE_FROM_REMOVAL}]"
+        for package in $SKIP_PACKAGE_FROM_REMOVAL ; do
+          if echo "${package}" | grep -q "${p}" ; then
+            skip=true
+          fi
+        done
+      fi
+
+      if $skip ; then
+        echo "*** Package '$p' listed in SKIP_PACKAGE_FROM_REMOVAL - skipping removal therefore ***"
+      else
+        echo "*** Removing $p from $REPOS to avoid out-of-date data ***"
+        ${SUDO_CMD:-} ${REPREPRO_CMD} -b "${REPOSITORY}" ${REPREPRO_OPTS} remove "${REPOS}" "${p}"
+      fi
+   done
+
+  fi
+}
+
+get_arch_changes() {
+  case ${architecture} in
+    all) echo '*';; # support as file expansion in reprepro cmdline
+      *) echo "${architecture}";;
+  esac
+}
+
+reprepro_wrapper() {
+  if [ -n "${SKIP_REPREPRO_WRAPPER:-}" ] ; then
+    echo "*** Skipping reprepro_wrapper as requested via SKIP_REPREPRO_WRAPPER ***"
+    return
+  fi
+
+  if ! [ -d "$REPOSITORY" ] ; then
+    bailout 1 "Error: repository ${REPOSITORY} does not exist."
+  fi
+
+  ${SUDO_CMD:-} generate-reprepro-codename "${REPOS}"
+
+  remove_packages
+  remove_missing_binary_packages
+
+  echo "*** Including packages in repository $REPOS ***"
+  ${SUDO_CMD:-} ${REPREPRO_CMD} -b "${REPOSITORY}" ${REPREPRO_OPTS} \
+    --ignore=wrongdistribution --ignore=uploaders --ignore=surprisingbinary \
+    include "${REPOS}" "${WORKSPACE}/binaries/"*"_${newest_version}_$(get_arch_changes).changes"
+  [ $? -eq 0 ] || bailout 1 "Error: Failed to include binary package in $REPOS repository."
+}
+
+dput_wrapper() {
+  command -v dput || bailout 1 "Error: dput not found."
+
+  echo "*** Including packages in repository $REPOS ***"
+  ${SUDO_CMD:-} dput -U -u "${DPUT_HOST:-}" "${WORKSPACE}/binaries/"*"_${newest_version}_$(get_arch_changes).changes"
+  [ $? -eq 0 ] || bailout 1 "Error: Failed to upload binary package to $DPUT_HOST dput host."
+}
+
+freight_ensure_repo() {
+  local varlib
+  local varcache
+
+  if [ ! -f "$FREIGHT_CONF" ] ; then
+    echo "*** Creating freight repository configuration in $FREIGHT_CONF ***"
+
+    ${SUDO_CMD:-} mkdir -p "$(dirname ${FREIGHT_CONF})"
+    ${SUDO_CMD:-} sh -c "cat > ${FREIGHT_CONF}" <<EOF
+# Generated by jenkins-debian-glue
+#
+# Directories for the Freight library and Freight cache.
+# Your web server's document root should point to \$VARCACHE.
+VARLIB="${FREIGHT_VARLIB:-/var/lib/freight}"
+VARCACHE="${FREIGHT_VARCACHE:-/var/cache/freight}"
+
+# Default 'Origin' and 'Label' fields for 'Release' files.
+ORIGIN="Freight"
+LABEL="Freight"
+
+# Cache the control files after each run (on), or regenerate them every
+# time (off).
+CACHE="off"
+
+# GPG key to sign repositories, derived from jenkins-debian-glue's \$KEY_ID setting
+GPG="${KEY_ID:-}"
+
+# Whether to follow symbolic links in \$VARLIB to produce extra components
+# in the cache directory (on) or not (off).
+SYMLINKS="off"
+EOF
+  fi
+
+  [ -f "$FREIGHT_CONF" ] || bailout 1 "Error: Failed to create freight configuration in $FREIGHT_CONF"
+
+  echo "*** Creating freight directory structure ***"
+  varlib=$(grep ^VARLIB "$FREIGHT_CONF" | cut -f 2 -d = | sed -e 's,",,g')
+  varcache=$(grep ^VARCACHE "$FREIGHT_CONF" | cut -f 2 -d = | sed -e 's,",,g')
+  ${SUDO_CMD:-} mkdir -p "${varcache}" "${varlib}"
+  ${SUDO_CMD:-} chmod o-rwx "${varlib}"
+}
+
+freight_wrapper() {
+  freight_ensure_repo
+
+  echo "*** Including packages via freight in repository ${FREIGHT_VARLIB}/${REPOS} ***"
+  ${SUDO_CMD:-} freight add -v -c "$FREIGHT_CONF" "${WORKSPACE}/binaries/"*"deb" "apt/${REPOS}"
+  [ $? -eq 0 ] || bailout 1 "Error: Failed to add binary package to repository."
+  echo "*** Including any source packages we also need in repository ${FREIGHT_VARLIB}/${REPOS} ***"
+  for ext in xz gz dsc; do
+    for i in ${WORKSPACE}/binaries/*.${ext}; do
+        [ -f "$i" ] || break
+        ${SUDO_CMD:-} freight add -v -c "$FREIGHT_CONF" "$i" "apt/${REPOS}"
+    done
+  done
+
+  echo "*** Generating freight cache ***"
+  if [ -z "${SHIP_FREIGHT_CACHE:-}" ] ; then
+     ${SUDO_CMD:-} freight cache -v -c "$FREIGHT_CONF" "apt/${REPOS}"
+  fi
+  [ $? -eq 0 ] || bailout 1 "Error: Failed to generate freight cache for ${FREIGHT_VARCACHE}."
+}
+
+trunk_release() {
+  # setting TRUNK_RELEASE=true enables release-trunk repository,
+  # to always get a copy of the package(s) to a central place
+  if [ -z "${TRUNK_RELEASE:-}" ] ; then
+    echo "*** TRUNK_RELEASE is not enabled ***"
+  elif [ "${IGNORE_RELEASE_TRUNK:-}" = "true" ] ; then
+    echo "*** IGNORE_RELEASE_TRUNK is set, ignoring request to add package(s) to $TRUNK_RELEASE repos ***"
+  else
+    echo "*** TRUNK_RELEASE is enabled ($TRUNK_RELEASE) ***"
+
+    ${SUDO_CMD:-} generate-reprepro-codename "$TRUNK_RELEASE"
+
+
+    if [ -n "${SKIP_REPREPRO_WRAPPER:-}" ] ; then
+      ${SUDO_CMD:-} ${REPREPRO_CMD} -b "${REPOSITORY}" ${REPREPRO_OPTS} \
+        --ignore=wrongdistribution --ignore=uploaders --ignore=surprisingbinary \
+        include "${TRUNK_RELEASE}" "${WORKSPACE}/binaries/"*"_${newest_version}_$(get_arch_changes).changes"
+      [ $? -eq 0 ] || bailout 1 "Error: Failed to include binary package in ${TRUNK_RELEASE} repository."
+    else
+      ${SUDO_CMD:-} ${REPREPRO_CMD} -b "${REPOSITORY}" ${REPREPRO_OPTS} \
+        --ignore=wrongdistribution copymatched "$TRUNK_RELEASE" "$REPOS" '*'
+      [ $? -eq 0 ] || bailout 1 "Error: Failed to copy packages from ${REPOS} to ${TRUNK_RELEASE}."
+    fi
+  fi
+}
+
+# Get rid of *unused* files to avoid uploading unreferenced files to incoming
+# directory. When generating the source package on jessie this might result in
+# a *.tar.xz file. But when building the binary package for an older release
+# like wheezy this might generate a *.tar.gz file. When directly copying those
+# files into reprepro's incoming directory (e.g. for release builds) the
+# *unused* tarball will be kept around, so let's avoid that.
+drop_unused_debfiles() {
+  if [ "${DROP_UNUSED_DEBFILES:-}" = "false" ] ; then
+    echo "*** DROP_UNUSED_DEBFILES is disabled, not removing unreferenced artifact files. ***"
+    return 0
+  fi
+
+  if ! [ -x "$(which dcmd)" ] ; then
+    echo "Error: dcmd executable not available, please install devscripts package." >&2
+    exit 1
+  fi
+
+  (
+    cd "${WORKSPACE}/binaries/"
+    for file in ./* ; do
+      filename="$(basename "${file}")" # get rid of trailing ./
+      if ! dcmd ./*.changes | grep -q -- "${filename}" ; then
+        echo "*** Removing file ${filename} ***"
+        rm -f "./${filename}"
+      fi
+    done
+  )
+}
+
+release_repos() {
+  echo "*** Environment variable 'release' is set, running through release steps. ***"
+
+  # if codename should be different from release
+  if [ -z "${RELEASE_DISTRIBUTION:-}" ] ; then
+    RELEASE_DISTRIBUTION="$release"
+    echo "*** Environment variable 'RELEASE_DISTRIBUTION' is unset, defaulting to $RELEASE_DISTRIBUTION ***"
+  fi
+
+  if [ -n "${RELEASE_REPOSITORY:-}" ]; then
+    local REPOSITORY="${RELEASE_REPOSITORY}"
+  else
+    local REPOSITORY="${REPOSITORY}/release/${release}"
+  fi;
+
+  mkdir -p "${REPOSITORY}/incoming/${RELEASE_DISTRIBUTION}"
+  mkdir -p "${REPOSITORY}/conf"
+
+  if [ "${REMOVE_FROM_RELEASE:-}" = 'true' ]; then
+    echo "*** REMOVE_FROM_RELEASE is set, trying to remove package(s) from release repository"
+    REPOS="${release}" remove_packages
+  fi
+
+  # get rid of files that aren't mentioned in the changes files before copying to incoming directory
+  drop_unused_debfiles
+
+  cp "${WORKSPACE}/binaries/"* "${REPOSITORY}/incoming/${RELEASE_DISTRIBUTION}/"
+  [ $? -eq 0 ] || bailout 1 "Error: Failed to copy binary packages to release directory."
+
+  REPOSITORY=$REPOSITORY generate-reprepro-codename "${RELEASE_DISTRIBUTION}"
+
+  # lock access to file to avoid duplicate entries when two build-and-provide-package
+  # runs happen at the very same time with regard to conf/incoming setup
+  (
+  flock --timeout 5 9 || bailout 1 "Error: could not lock file ${REPOSITORY}/conf/incoming, giving up."
+
+  if ! grep -q "^Name: $RELEASE_DISTRIBUTION$" "${REPOSITORY}/conf/incoming" 2>/dev/null ; then
+    cat >> "${REPOSITORY}/conf/incoming" << EOF
+
+Name: ${RELEASE_DISTRIBUTION}
+IncomingDir: incoming/${RELEASE_DISTRIBUTION}
+TempDir: tmp
+LogDir: log
+MorgueDir: ${REPOSITORY}/morgue
+Default: ${RELEASE_DISTRIBUTION}
+Permit: unused_files
+Cleanup: unused_files on_deny on_error
+
+EOF
+  fi
+  ) 9>/var/lock/jdg-build-and-provide-incoming."$(id -un)" || bailout 1 "Error while setting up incoming repository."
+
+  local old_dir=$(pwd)
+  cd "${REPOSITORY}/incoming/${RELEASE_DISTRIBUTION}"
+  ${SUDO_CMD:-} ${REPREPRO_CMD} -b "${REPOSITORY}" ${REPREPRO_OPTS} --ignore=wrongdistribution \
+                processincoming "${RELEASE_DISTRIBUTION}" "$(basename ${WORKSPACE}/binaries/*.changes)"
+  local RC=$?
+  cd "$old_dir"
+
+  if [ $RC -ne 0 ] ; then
+    bailout 1 "Error: Failed to execute processincoming for release ${release}."
+  fi
+}
+
+deploy_to_releases() {
+
+  # support usage of same source package to build binaries for different distributions
+  if [ -n "${ADJUST_DISTRIBUTION_ONTHEFLY:-}" ] ; then
+    echo "*** ADJUST_DISTRIBUTION_ONTHEFLY is set, setting Distribution in changes file as requested to ${distribution} ***"
+    sed -i "s/Distribution: .*/Distribution: ${distribution}/" "${WORKSPACE}/binaries/"*"_${newest_version}"_${architecture}.changes
+  fi
+
+  if [ -n "${USE_FREIGHT:-}" ] ; then
+    freight_wrapper
+    # Freight is currently not able to manage release or trunk release repos,
+    # so this is the stage where we exit in that case.
+    return 0
+  fi
+  if [ -n "${USE_DPUT:-}" ] ; then
+    dput_wrapper
+    return 0
+  fi
+
+  if [ -n "${release:-}" ] && [ "$release" != "none" ] && [ "$release" != "trunk" ] && \
+    # '${release}' is a hidden bomb: when provided through predefined parameters
+    # from an upstream jenkins job (like foo-binaries receiving the parameters
+    # from foo-source) but the job (foo-binaries) gets triggered manually (without
+    # setting the predefined parameters therefore) then ${release} is set to
+    # '${release}' instead of being empty
+    [ "${release}" != '${release}' ] ; then
+
+    if [ -z "${RELEASE_REPOSITORIES:-}" ] ; then
+      release_repos
+    else
+      # allow pushing packages to multiple release repositories, like:
+      # RELEASE_REPOSITORIES="/srv/repository/release/ce/${release} /srv/repository/release/pro/${release}"
+      for release_repository in ${RELEASE_REPOSITORIES:-} ; do
+        RELEASE_REPOSITORY="$release_repository" release_repos
+      done
+    fi
+  else
+    reprepro_wrapper
+    trunk_release
+  fi
+}
+
+# make them available for the Jenkin's 'Archiving artifacts'
+binaries_to_workspace() {
+  echo "*** Moving binaries files to workspace. ***"
+  mv "${WORKSPACE}/binaries/"* "${WORKSPACE}/"
+  rmdir "${WORKSPACE}/binaries/"
+}
+
+# main execution
+trap bailout SIGHUP SIGINT SIGQUIT SIGABRT SIGALRM SIGTERM
+
+checks_and_defaults
+clean_workspace
+identify_package_name
+set_base_path
+build_info
+identify_sourcefile
+dist_and_arch_settings
+
+# do not run in repos job?
+if [ -n "${PROVIDE_ONLY:-}" ] ; then
+  echo "*** Config variable 'PROVIDE_ONLY' is set, ignoring request to run cowbuilder. ***"
+else
+  cowbuilder_init
+  cowbuilder_run
+fi
+
+# do not run in binaries job?
+if [ -n "${BUILD_ONLY:-}" ] ; then
+  echo "*** Config variable 'BUILD_ONLY' is set, ignoring request to use local repository. ***"
+else
+  deploy_to_releases
+fi
+
+binaries_to_workspace
+autopkg_run
+autopkgtest_results
+
+if [ -n "${POST_BUILD_HOOK:-}" ] ; then
+  echo "*** Found environment variable POST_BUILD_HOOK, set to ${POST_BUILD_HOOK:-} ***"
+  sh ${POST_BUILD_HOOK:-}
+fi
+
+bailout 0
+
+# vim:foldmethod=marker ts=2 ft=sh ai expandtab sw=2
