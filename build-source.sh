@@ -39,8 +39,14 @@ export GIT_BRANCH=$BRANCH_NAME
 cd ..
 
 if [ -f source/ubports.source_location ]; then
-  rm $(head -n 2 source/ubports.source_location | tail -1) || true
-  wget -O $(head -n 2 source/ubports.source_location | tail -1) $(head -n 1 source/ubports.source_location)
+  while read -r SOURCE_URL && read -r SOURCE_FILENAME; do
+    if [ -f "$SOURCE_FILENAME" ]; then
+      rm "$SOURCE_FILENAME"
+    fi
+
+    wget -O "$SOURCE_FILENAME" "$SOURCE_URL"
+  done <source/ubports.source_location
+
   export IGNORE_GIT_BUILDPACKAGE=true
   export USE_ORIG_VERSION=true
   export SKIP_DCH=true
