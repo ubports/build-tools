@@ -52,7 +52,7 @@ else
   export distribution=$(cat distribution.buildinfo)
   export REPOS="$release"
   export BASE_PATH="binaries/"
-  for suffix in gz bz2 xz deb ddeb dsc changes ; do
+  for suffix in gz bz2 xz deb dsc changes ; do
     mv *.${suffix} binaries/ || true
   done
 	/usr/bin/build-and-provide-package
