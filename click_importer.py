@@ -130,7 +130,7 @@ for app in apps:
                 print("downloading %s" % app_info["name"])
             else:
                 download_app(download_found["download_url"], app_info["id"], output_dir)
-            ctrl.update(app_info["id"], app_info["revision"])
+            ctrl.update(app_info["id"], download_found["revision"])
         else:
             print("Could not find %s in channel %s" % (app_info["name"], channel))
     else:
