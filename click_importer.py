@@ -58,8 +58,8 @@ def get_app_info(app):
         return False
     return r.json()["data"]
 
-def download_app(url, id, dest):
-    fileName = "%s_armhf.click" % id
+def download_app(url, id, arch, dest):
+    fileName = "%s_%s.click" % (id, arch)
     request = requests.get(url, stream=True)
     try:
         total_length = int(request.headers.get('content-length'))
@@ -129,7 +129,8 @@ for app in apps:
             if args.dry:
                 print("downloading %s" % app_info["name"])
             else:
-                download_app(download_found["download_url"], app_info["id"], output_dir)
+                download_app(download_found["download_url"], app_info["id"],
+                             app_info["architecture"], output_dir)
             ctrl.update(app_info["id"], download_found["revision"])
         else:
             print("Could not find %s in channel %s" % (app_info["name"], channel))
