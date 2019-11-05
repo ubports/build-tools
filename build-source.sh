@@ -18,7 +18,6 @@
 MULTI_DIST="xenial bionic"
 
 DIST="vivid xenial artful bionic"
-DIST_DEV="vivid-dev xenial-dev"
 
 if [ ! "$SKIP_MOVE" = "true" ]; then
         tmp=$(mktemp -d)
@@ -80,7 +79,6 @@ if [ "$GIT_BRANCH" == "master" ]; then
     /usr/bin/generate-git-snapshot
     mkdir -p "mbuild/$d"
     mv *+0~$d* "mbuild/$d"
-    rm mbuild/$d/*.changes || true
     unset TIMESTAMP_FORMAT
     unset DIST_OVERRIDE
   done
@@ -89,7 +87,6 @@ if [ "$GIT_BRANCH" == "master" ]; then
 else
   export TIMESTAMP_FORMAT="$d%Y%m%d%H%M%S"
   /usr/bin/generate-git-snapshot
-  rm *.changes
   echo "Gen git snapshot done"
 fi
 

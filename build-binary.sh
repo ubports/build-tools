@@ -66,3 +66,6 @@ else
 	export distribution=$(cat distribution.buildinfo)
 	/usr/bin/build-and-provide-package
 fi
+
+. /etc/jenkins/debian_glue
+debsign -k"${KEY_ID:-}" *.changes
