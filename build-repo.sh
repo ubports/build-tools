@@ -19,6 +19,9 @@ mkdir -p binaries
 
 export PROVIDE_ONLY=true
 export SUDO_CMD=sudo
+export BASE_PATH="binaries/"
+
+# Aptly does not need sudo, as the jenkins user is in the aptly group
 
 if [ -f multidist.buildinfo ]; then
 	echo "Doing multibuild"
@@ -36,14 +39,21 @@ if [ -f multidist.buildinfo ]; then
     export REPOS="$release"
     export WORKSPACE="$rootwp/mbuild/$d"
     cd "$WORKSPACE"
-    mkdir binaries/ || true
+    mkdir $BASE_PATH || true
     for suffix in gz bz2 xz deb dsc changes ; do
-      mv *.${suffix} binaries/ || true
+      mv *.${suffix} $BASE_PATH || true
     done
-    export BASE_PATH="binaries/"
+
+    if ! aptly repo show $release ; then
+      aptly repo create -distribution="$release" $release
+      aptly publish repo $release filesystem:repo:main
+    fi
+    aptly repo include -accept-unsigned -repo="$release" $BASE_PATH
+    aptly publish update $release filesystem:repo:main
+
 		/usr/bin/build-and-provide-package
     for suffix in gz bz2 xz deb dsc changes ; do
-      mv binaries/*.${suffix} $rootwp || true
+      mv $BASE_PATH*.${suffix} $rootwp || true
     done
     cd $rootwp
 	done
@@ -51,9 +61,17 @@ else
   export release=$(cat branch.buildinfo)
   export distribution=$(cat distribution.buildinfo)
   export REPOS="$release"
-  export BASE_PATH="binaries/"
+
   for suffix in gz bz2 xz deb dsc changes ; do
-    mv *.${suffix} binaries/ || true
+    mv *.${suffix} $BASE_PATH || true
   done
+
+  if ! aptly repo show $release ; then
+    aptly repo create -distribution="$release" $release
+    aptly publish repo $release filesystem:repo:main
+  fi
+  aptly repo include -accept-unsigned -repo="$release" $BASE_PATH
+  aptly publish update $release filesystem:repo:main
+
 	/usr/bin/build-and-provide-package
 fi
