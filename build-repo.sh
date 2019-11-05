@@ -40,7 +40,7 @@ if [ -f multidist.buildinfo ]; then
     export WORKSPACE="$rootwp/mbuild/$d"
     cd "$WORKSPACE"
     mkdir $BASE_PATH || true
-    for suffix in gz bz2 xz deb dsc changes ; do
+    for suffix in gz bz2 xz deb dsc changes ddeb ; do
       mv *.${suffix} $BASE_PATH || true
     done
 
@@ -62,7 +62,7 @@ else
   export distribution=$(cat distribution.buildinfo)
   export REPOS="$release"
 
-  for suffix in gz bz2 xz deb dsc changes ; do
+  for suffix in gz bz2 xz deb dsc changes ddeb ; do
     mv *.${suffix} $BASE_PATH || true
   done
 
