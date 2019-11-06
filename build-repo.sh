@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Copyright (C) 2017 Marius Gripsgard <marius@ubports.com>
 #
 # This program is free software: you can redistribute it and/or modify
@@ -15,68 +17,49 @@
 
 set -xe
 
-mkdir -p binaries
-
-export PROVIDE_ONLY=true
-export SUDO_CMD=sudo
-export BASE_PATH="binaries/"
-
 # Aptly does not need sudo, as the jenkins user is in the aptly group
+# Moving files to a seperate path to make sure we only include what 
+# we want in the repos
+
+BASE_PATH="binaries/"
 
 if [ -f multidist.buildinfo ]; then
-	echo "Doing multibuild"
-	MULTI_DIST=$(cat multidist.buildinfo)
-  for t in multidist*.tar.gz ; do
+  echo "Doing multibuild"
+  MULTI_DIST=$(cat multidist.buildinfo)
+  for t in multidist*.tar.gz; do
     tar --overwrite -xvzf $t
   done
-	rm multidist*.tar.gz || true
+  rm multidist*.tar.gz || true
   export rootwp=$(pwd)
 
-	for d in $MULTI_DIST ; do
-		echo "Repo-ing for $d"
-		export distribution="$d"
-    export release="$d"
-    export REPOS="$release"
-    export WORKSPACE="$rootwp/mbuild/$d"
-    cd "$WORKSPACE"
+  for release in $MULTI_DIST; do
+    echo "Repo-ing for $release"
+
+    cd "$rootwp/mbuild/$release"
     mkdir $BASE_PATH || true
-    for suffix in gz bz2 xz deb dsc changes ddeb ; do
+    for suffix in gz bz2 xz deb dsc changes ddeb; do
       mv *.${suffix} $BASE_PATH || true
     done
 
-    if ! aptly repo show $release ; then
+    if ! aptly repo show $release; then
       aptly repo create -distribution="$release" $release
       aptly publish repo $release filesystem:repo:main
     fi
-    aptly repo include -no-remove-files -repo="$release" $BASE_PATH
+    aptly repo include -repo="$release" $BASE_PATH
     aptly publish update $release filesystem:repo:main
-
-    # Freight hates ddeb files
-    rm $BASE_PATH/*.ddeb || true
-		/usr/bin/build-and-provide-package
-    for suffix in gz bz2 xz deb dsc changes ; do
-      mv $BASE_PATH*.${suffix} $rootwp || true
-    done
-    cd $rootwp
-	done
+  done
 else
-  export release=$(cat branch.buildinfo)
-  export distribution=$(cat distribution.buildinfo)
-  export REPOS="$release"
+  release=$(cat branch.buildinfo)
 
-  for suffix in gz bz2 xz deb dsc changes ddeb ; do
+  mkdir -p $BASE_PATH
+  for suffix in gz bz2 xz deb dsc changes ddeb; do
     mv *.${suffix} $BASE_PATH || true
   done
 
-  if ! aptly repo show $release ; then
+  if ! aptly repo show $release; then
     aptly repo create -distribution="$release" $release
     aptly publish repo $release filesystem:repo:main
   fi
-  aptly repo include -no-remove-files -repo="$release" $BASE_PATH
+  aptly repo include -repo="$release" $BASE_PATH
   aptly publish update $release filesystem:repo:main
-
-  # Freight hates ddeb files
-  rm $BASE_PATH/*.ddeb || true
-
-	/usr/bin/build-and-provide-package
 fi
