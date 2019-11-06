@@ -48,7 +48,7 @@ if [ -f multidist.buildinfo ]; then
       aptly repo create -distribution="$release" $release
       aptly publish repo $release filesystem:repo:main
     fi
-    aptly repo include -accept-unsigned -repo="$release" $BASE_PATH
+    aptly repo include -repo="$release" $BASE_PATH
     aptly publish update $release filesystem:repo:main
 
 		/usr/bin/build-and-provide-package
@@ -70,7 +70,7 @@ else
     aptly repo create -distribution="$release" $release
     aptly publish repo $release filesystem:repo:main
   fi
-  aptly repo include -accept-unsigned -repo="$release" $BASE_PATH
+  aptly repo include -repo="$release" $BASE_PATH
   aptly publish update $release filesystem:repo:main
 
 	/usr/bin/build-and-provide-package
