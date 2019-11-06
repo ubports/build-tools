@@ -51,6 +51,8 @@ if [ -f multidist.buildinfo ]; then
     aptly repo include -no-remove-files -repo="$release" $BASE_PATH
     aptly publish update $release filesystem:repo:main
 
+    # Freight hates ddeb files
+    rm $BASE_PATH/*.ddeb || true
 		/usr/bin/build-and-provide-package
     for suffix in gz bz2 xz deb dsc changes ; do
       mv $BASE_PATH*.${suffix} $rootwp || true
@@ -72,6 +74,9 @@ else
   fi
   aptly repo include -no-remove-files -repo="$release" $BASE_PATH
   aptly publish update $release filesystem:repo:main
+
+  # Freight hates ddeb files
+  rm $BASE_PATH/*.ddeb || true
 
 	/usr/bin/build-and-provide-package
 fi
