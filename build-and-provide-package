@@ -458,7 +458,7 @@ identify_build_type() {
   fi
 
   # defaults
-  DEBBUILDOPTS="-sa"
+  DEBBUILDOPTS="-b"
   SKIP_ARCH_BUILD=false
 
   if [ "${architecture:-}" = "all" ] ; then
