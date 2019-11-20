@@ -40,7 +40,7 @@ if [ -f multidist.buildinfo ]; then
     export WORKSPACE="$rootwp/mbuild/$d"
     cd "$WORKSPACE"
     mkdir $BASE_PATH || true
-    for suffix in gz bz2 xz deb dsc changes ddeb ; do
+    for suffix in gz bz2 xz deb dsc changes ddeb udeb ; do
       mv *.${suffix} $BASE_PATH || true
     done
 
@@ -51,8 +51,8 @@ if [ -f multidist.buildinfo ]; then
     aptly repo include -no-remove-files -repo="$release" $BASE_PATH
     aptly publish update $release filesystem:repo:main
 
-    # Freight hates ddeb files
-    rm $BASE_PATH/*.ddeb || true
+    # Freight hates non-standard files
+    rm $BASE_PATH/*.ddeb $BASE_PATH/*.udeb || true
 		/usr/bin/build-and-provide-package
     for suffix in gz bz2 xz deb dsc changes ; do
       mv $BASE_PATH*.${suffix} $rootwp || true
@@ -64,7 +64,7 @@ else
   export distribution=$(cat distribution.buildinfo)
   export REPOS="$release"
 
-  for suffix in gz bz2 xz deb dsc changes ddeb ; do
+  for suffix in gz bz2 xz deb dsc changes ddeb udeb ; do
     mv *.${suffix} $BASE_PATH || true
   done
 
@@ -75,8 +75,8 @@ else
   aptly repo include -no-remove-files -repo="$release" $BASE_PATH
   aptly publish update $release filesystem:repo:main
 
-  # Freight hates ddeb files
-  rm $BASE_PATH/*.ddeb || true
+  # Freight hates non-standard files
+  rm $BASE_PATH/*.ddeb $BASE_PATH/*.udeb || true
 
 	/usr/bin/build-and-provide-package
 fi
