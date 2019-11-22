@@ -1,5 +1,5 @@
-String stashFileList = '*.gz,*.bz2,*.xz,*.deb,*.ddeb,*.dsc,*.changes,*.buildinfo,lintian.txt'
-String archiveFileList = '*.gz,*.bz2,*.xz,*.deb,*.ddeb,*.dsc,*.changes,*.buildinfo'
+String stashFileList = '*.gz,*.bz2,*.xz,*.deb,*.ddeb,*.udeb,*.dsc,*.changes,*.buildinfo,lintian.txt'
+String archiveFileList = '*.gz,*.bz2,*.xz,*.deb,*.ddeb,*.udeb,*.dsc,*.changes,*.buildinfo'
 
 pipeline {
   agent any
