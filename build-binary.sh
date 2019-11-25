@@ -61,11 +61,17 @@ if [ -f multidist.buildinfo ]; then
 		/usr/bin/build-and-provide-package
 		cd $rootwp
 	done
+
+	. /etc/jenkins/debian_glue
+	for d in $MULTI_DIST ; do
+		debsign -k"${KEY_ID:-}" "mbuild/$d/"*.changes
+	done
+
 	tar -zcvf multidist-$architecture-$RANDOM.tar.gz mbuild
 else
 	export distribution=$(cat distribution.buildinfo)
 	/usr/bin/build-and-provide-package
-fi
 
-. /etc/jenkins/debian_glue
-debsign -k"${KEY_ID:-}" *.changes
+	. /etc/jenkins/debian_glue
+	debsign -k"${KEY_ID:-}" *.changes
+fi
