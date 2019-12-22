@@ -17,7 +17,7 @@
 # Multi distro, set here to build master for multripple distros!
 MULTI_DIST="xenial bionic"
 
-DIST="vivid xenial artful bionic"
+DIST="vivid xenial artful bionic focal"
 
 if [ ! "$SKIP_MOVE" = "true" ]; then
         tmp=$(mktemp -d)

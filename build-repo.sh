@@ -20,6 +20,7 @@ mkdir -p binaries
 export PROVIDE_ONLY=true
 export SUDO_CMD=sudo
 export BASE_PATH="binaries/"
+export APTLY_ONLY="focal"
 
 # Aptly does not need sudo, as the jenkins user is in the aptly group
 
@@ -72,8 +73,16 @@ else
     aptly repo create -distribution="$release" $release
     aptly publish repo $release filesystem:repo:main
   fi
-  aptly repo include -no-remove-files -repo="$release" $BASE_PATH || true
-  aptly publish update -force-overwrite $release filesystem:repo:main
+
+  if echo $APTLY_ONLY | grep -w $release > /dev/null; then
+    aptly repo include -repo="$release" $BASE_PATH
+    aptly publish update -force-overwrite $release filesystem:repo:main
+    echo "$release is set to aptly only, im going to exit here :)"
+    exit 0
+  else
+    aptly repo include -no-remove-files -repo="$release" $BASE_PATH || true
+    aptly publish update -force-overwrite $release filesystem:repo:main
+  fi
 
   # Freight hates non-standard files
   rm $BASE_PATH/*.ddeb $BASE_PATH/*.udeb || true
