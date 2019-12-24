@@ -41,7 +41,7 @@ if [ -f multidist.buildinfo ]; then
     export WORKSPACE="$rootwp/mbuild/$d"
     cd "$WORKSPACE"
     mkdir $BASE_PATH || true
-    for suffix in gz bz2 xz deb dsc changes ddeb udeb ; do
+    for suffix in gz bz2 xz deb dsc changes ddeb udeb buildinfo ; do
       mv *.${suffix} $BASE_PATH || true
     done
 
@@ -55,7 +55,7 @@ if [ -f multidist.buildinfo ]; then
     # Freight hates non-standard files
     rm $BASE_PATH/*.ddeb $BASE_PATH/*.udeb || true
 		/usr/bin/build-and-provide-package
-    for suffix in gz bz2 xz deb dsc changes ; do
+    for suffix in gz bz2 xz deb dsc change ; do
       mv $BASE_PATH*.${suffix} $rootwp || true
     done
     cd $rootwp
@@ -65,7 +65,7 @@ else
   export distribution=$(cat distribution.buildinfo)
   export REPOS="$release"
 
-  for suffix in gz bz2 xz deb dsc changes ddeb udeb ; do
+  for suffix in gz bz2 xz deb dsc changes ddeb udeb buildinfo ; do
     mv *.${suffix} $BASE_PATH || true
   done
 
