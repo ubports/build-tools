@@ -20,7 +20,10 @@ import os
 import sys
 import subprocess
 
-DEB_SOURCE_TEMPLATE = "deb http://repo.ubports.com/ %s main"
+REPO_BASE = "http://repo.ubports.com/"
+
+DEB_SOURCE_TEMPLATE = "deb %s %s main"
+CHECK_TEMPLATE = "%sdists/%s/Release"
 VALID_ARCH = ["armhf", "arm64", "amd64"]
 
 MAIN = "http://archive.ubuntu.com/ubuntu/"
@@ -28,8 +31,8 @@ PORTS = "http://ports.ubuntu.com/ubuntu-ports/"
 BACKPORTS = "deb {} xenial-backports main restricted universe"
 
 
-def repo_exist(repo):
-    r = requests.get("http://repo.ubports.com/dists/%s/Release" % repo)
+def repo_exist(repo, base=REPO_BASE):
+    r = requests.get(CHECK_TEMPLATE % (base, repo))
     return r.status_code == 200
 
 
@@ -110,6 +113,13 @@ depends_list = []
 
 branch = get_branch()
 
+base = REPO_BASE
+if (branch.startswith("focal")):
+    base = "http://repo2.ubports.com/"
+
+print(base)
+print(branch)
+
 # Extension arch
 if is_arch_ext(branch):
     arch = arch_extension_get_arch(branch)
@@ -125,7 +135,7 @@ if is_arch_ext(branch):
         sys.exit(1)
 
 # Working repo
-if repo_exist(branch):
+if repo_exist(branch, base):
     depends_list.append(branch)
 else:
     print("WARNING: branch repo '%s' does not exist, please ignore if this is a new branch" % branch)
@@ -135,7 +145,7 @@ if is_extension(branch):
     base_extensions = extension_get_repos(branch)
     print(base_extensions)
     for base_extension in base_extensions:
-        if repo_exist(base_extension):
+        if repo_exist(base_extension, base):
             depends_list.append(base_extension)
         else:
             print("ERROR: Extension repo '%s' do not exist" % base_extension)
@@ -152,12 +162,12 @@ if ubports_depends_exist():
             base_extensions = extension_get_repos(_depend)
             print(base_extensions)
             for base_extension in base_extensions:
-                if repo_exist(base_extension):
+                if repo_exist(base_extension, base):
                     depends_list.append(base_extension)
                 else:
                     print("ERROR: Extension repo '%s' do not exist" % base_extension)
                     sys.exit(1)
-        if repo_exist(_depend):
+        if repo_exist(_depend, base):
             depends_list.append(_depend)
         else:
             print("ERROR: ubports.depends repo '%s' do not exist" % _depend)
@@ -167,7 +177,7 @@ print("Branches %s " % depends_list)
 
 deb_sources_list = []
 for _depend in depends_list:
-    deb_sources_list.append(DEB_SOURCE_TEMPLATE % _depend)
+    deb_sources_list.append(DEB_SOURCE_TEMPLATE % (base, _depend))
 
 if enable_backports():
     deb_sources_list.append(BACKPORTS.format(get_archive()))
