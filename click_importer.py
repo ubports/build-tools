@@ -17,25 +17,27 @@
 
 # I import clicks from the openstore
 
-import argparse, requests, tqdm, os, configparser
+import argparse, requests, tqdm, os, configparser, copy
 
 class Ctrl(object):
-    def __init__(self, path):
+    def __init__(self, path, arches):
         self.path = path
+        self.arches = copy.copy(arches)
+        self.arches.append("all")
         self.file = os.path.join(path, 'apps_ctrl.ini')
         self.read()
 
-    def get(self):
-        return self.config["apps"]
+    def get(self, arch):
+        return self.config["apps-{}".format(arch)]
 
-    def update(self, app, rev):
-        self.config["apps"][app] = str(rev)
+    def update(self, app, rev, arch):
+        self.config["apps-{}".format(arch)][app] = str(rev)
         self.write()
 
-    def isNew(self, app, rev):
-        if not app in self.get():
+    def isNew(self, app, rev, arch):
+        if not app in self.get(arch):
             return True
-        if int(self.get()[app]) < rev:
+        if int(self.get(arch)[app]) < rev:
             return True
         return False
 
@@ -47,8 +49,14 @@ class Ctrl(object):
         config = configparser.ConfigParser()
         if os.path.exists(self.file):
             config.read(self.file)
-        if not "apps" in config:
-            config["apps"] = {}
+
+        if "apps" in config:
+            config["apps-armhf"] = config["apps"]
+            del config["apps"]
+
+        for arch in self.arches:
+            if not "apps-{}".format(arch) in config:
+                config["apps-{}".format(arch)] = {}
         self.config = config
 
 
@@ -76,8 +84,50 @@ def download_app(url, id, arch, dest):
     os.rename("%s/%s.tmp" % (dest, fileName), "%s/%s" % (dest, fileName))
     return "%s/%s" % (dest, fileName)
 
+def check_and_download(ctrl, app_info, output_dir, download_found, args):
+    arch = download_found["architecture"]
+    channel = download_found["channel"]
+    if ctrl.isNew(app_info["id"], download_found["revision"], arch):
+        print("New version of %s (%s)" % (app_info["name"], arch))
+    else:
+        print("No new version of %s (%s)" % (app_info["name"], arch))
+        return
+    if args.dry:
+        print("downloading %s (%s)" % (app_info["name"], arch))
+    else:
+        download_app(download_found["download_url"], app_info["id"],
+                    arch, output_dir)
+    ctrl.update(app_info["id"], download_found["revision"], arch)
+
+def find_download(downloads, channel, arch):
+    download_found = False
+    for download in downloads:
+        if download["channel"] == channel and download["architecture"] == arch:
+            download_found = download
+
+    return download_found
+
+def find_downloads(apps, channel, arches, output_dir, args):
+    ctrl = Ctrl(output_dir, arches)
+    for app in apps:
+        app_info = get_app_info(app)
+        if app_info:
+            if app_info["architecture"] == "all":
+                down = find_download(app_info["downloads"], channel, "all")
+                check_and_download(ctrl, app_info, output_dir, down, args)
+            else:
+                for arch in arches:
+                    if not arch in app_info["architectures"]:
+                        print("Could not find %s in channel %s for arch %s" % (app_info["name"], channel, arch))
+                        continue
+                    down = find_download(app_info["downloads"], channel, arch)
+                    check_and_download(ctrl, app_info, output_dir, down, args)
+        else:
+            print("Could find fined app %s... ignoring" % app)
+
+
 DEFAULT_DIR="clicks"
-BASE_API="http://open-store.io/api/v3/"
+BASE_API="http://open-store.io/api/v4/"
 APPS_API=BASE_API+"apps/"
 
 parser = argparse.ArgumentParser(description='I import clicks from the openstore')
@@ -90,8 +140,9 @@ group.add_argument("--apps", "-a", nargs="+", help="apps to import")
 
 args = parser.parse_args()
 
-output_dir = DEFAULT_DIR;
+output_dir = DEFAULT_DIR
 channel = "xenial"
+arches = ["arm64", "armhf"]
 apps = args.apps
 
 if args.channel:
@@ -103,6 +154,9 @@ if args.dir:
         exit()
     output_dir = args.dir
 
+if not os.path.exists(output_dir):
+    os.mkdir(output_dir)
+
 if args.file:
     if os.path.isfile(args.file):
         apps = []
@@ -110,29 +164,4 @@ if args.file:
             apps = f.readlines()
         apps = [x.strip() for x in apps]
 
-ctrl = Ctrl(output_dir)
-
-for app in apps:
-    app_info = get_app_info(app)
-    if app_info:
-        download_found = False
-        for download in app_info["downloads"]:
-            if download["channel"] == channel:
-                download_found = download
-
-        if (download_found):
-            if ctrl.isNew(app_info["id"], download_found["revision"]):
-                print("New version of %s" % app_info["name"])
-            else:
-                print("No new version of %s" % app_info["name"])
-                continue
-            if args.dry:
-                print("downloading %s" % app_info["name"])
-            else:
-                download_app(download_found["download_url"], app_info["id"],
-                             app_info["architecture"], output_dir)
-            ctrl.update(app_info["id"], download_found["revision"])
-        else:
-            print("Could not find %s in channel %s" % (app_info["name"], channel))
-    else:
-        print("Could find fined app %s... ignoring" % app)
+find_downloads(apps, channel, arches, output_dir, args)
