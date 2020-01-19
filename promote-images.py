@@ -74,7 +74,7 @@ parser.add_argument("copy_images_script", metavar="COPY-IMAGES-SCRIPT")
 parser.add_argument("source_channel", metavar="SOURCE-CHANNEL")
 parser.add_argument("destination_channel", metavar="DESTINATION-CHANNEL")
 parser.add_argument("device_list", metavar="DEVICE-LIST")
-parser.add_argument("-r", "--version", type=int, required=True)
+parser.add_argument("-r", "--version", type=int)
 parser.add_argument("-o", "--offset", type=int, help="Version offset")
 parser.add_argument("-k", "--keep-version", action="store_true",
                     help="Keep the original version number")
