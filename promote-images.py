@@ -176,12 +176,17 @@ for device in devices:
     if args.dry:
         print(cmd)
     else:
-        subprocess.run(cmd, check=False)
-        pushData = '{"{}/{}": [{}, ""]}'.format(args.destination_channel, device, args.version)
+        result = subprocess.run(cmd, capture_output=True)
+        if result.returncode != 0:
+            print("Error during execution of copy-image, result might be broken!")
+            sys.exit(result.returncode)
+        new_version = int(result.stdout)
+        print("Sending broadcast push notification for device '{}' on channel '{}' and version '{}'".format(device, args.destination_channel, new_version))
+        pushData = '{"{}/{}": [{}, ""]}'.format(args.destination_channel, device, new_version)
         expiresTime = datetime.datetime.now() + datetime.timedelta(days=1)
         r = requests.post(
             PUSH_BROADCAST_URL,
             data=PUSH_DATA % (expiresTime.isoformat(), pushData),
             headers={'content-type': 'application/json'})
         if r.status_code != 200:
-            print("WARNING: Push notification failed for device '{}' on channel '{}' with: \nHTTP {}\n{}\n".format(device, args.destination_channel, r.status_code, r.text))
+            print("WARNING: Push notification failed with: \nHTTP {}\n{}\n".format(r.status_code, r.text))
