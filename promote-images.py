@@ -177,7 +177,7 @@ for device in devices:
     if args.dry:
         print(cmd)
     else:
-        result = subprocess.run(cmd, capture_output=True)
+        result = subprocess.run(cmd, check=True, stdout=subprocess.PIPE)
         if result.returncode != 0:
             print("Error during execution of copy-image, result might be broken!")
             sys.exit(result.returncode)
