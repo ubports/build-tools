@@ -26,15 +26,6 @@ import time
 
 import requests
 
-
-PUSH_BROADCAST_URL = 'https://push.ubports.com/broadcast'
-PUSH_DATA = '''{
-    "channel": "system",
-    "expire_on": "%s",
-    "data": %s
-}'''
-
-
 def getLastTag(channel):
     tag = None
     index = requests.get("https://system-image.ubports.com/ubports-touch/16.04/%s/bacon/index.json" % channel)
@@ -177,18 +168,7 @@ for device in devices:
     if args.dry:
         print(cmd)
     else:
-        result = subprocess.run(cmd, check=True, stdout=subprocess.PIPE)
+        result = subprocess.run(cmd)
         if result.returncode != 0:
             print("Error during execution of copy-image, result might be broken!")
             sys.exit(result.returncode)
-        new_version = int(result.stdout)
-        print("Sending broadcast push notification for device '{}' on channel '{}' and version '{}'".format(device, args.destination_channel, new_version))
-        identifier = "{}/{}".format(args.destination_channel, device)
-        pushData = {identifier: [new_version, '']}
-        expiresTime = datetime.datetime.utcnow() + datetime.timedelta(days=1)
-        r = requests.post(
-            PUSH_BROADCAST_URL,
-            data=PUSH_DATA % (expiresTime.replace(microsecond=0).isoformat()+"Z", json.dumps(pushData)),
-            headers={'content-type': 'application/json'})
-        if r.status_code != 200:
-            print("WARNING: Push notification failed with: \nHTTP {}\n{}\n".format(r.status_code, r.text))
