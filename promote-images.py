@@ -19,6 +19,7 @@
 
 import argparse
 import datetime
+import json
 import os
 import subprocess
 import time
@@ -30,7 +31,7 @@ PUSH_BROADCAST_URL = 'https://push.ubports.com/broadcast'
 PUSH_DATA = '''{
     "channel": "system",
     "expire_on": "%s",
-    "data": "%s"
+    "data": %s
 }'''
 
 
@@ -182,11 +183,12 @@ for device in devices:
             sys.exit(result.returncode)
         new_version = int(result.stdout)
         print("Sending broadcast push notification for device '{}' on channel '{}' and version '{}'".format(device, args.destination_channel, new_version))
-        pushData = '{"{}/{}": [{}, ""]}'.format(args.destination_channel, device, new_version)
-        expiresTime = datetime.datetime.now() + datetime.timedelta(days=1)
+        identifier = "{}/{}".format(args.destination_channel, device)
+        pushData = {identifier: [new_version, '']}
+        expiresTime = datetime.datetime.utcnow() + datetime.timedelta(days=1)
         r = requests.post(
             PUSH_BROADCAST_URL,
-            data=PUSH_DATA % (expiresTime.isoformat(), pushData),
+            data=PUSH_DATA % (expiresTime.replace(microsecond=0).isoformat()+"Z", json.dumps(pushData)),
             headers={'content-type': 'application/json'})
         if r.status_code != 200:
             print("WARNING: Push notification failed with: \nHTTP {}\n{}\n".format(r.status_code, r.text))
