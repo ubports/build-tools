@@ -31,7 +31,7 @@ PUSH_BROADCAST_URL = 'https://push.ubports.com/broadcast'
 PUSH_DATA = '''{
     "channel": "system",
     "expire_on": "%s",
-    "data": %s
+    "data": "%s"
 }'''
 
 
@@ -184,7 +184,7 @@ for device in devices:
         new_version = int(result.stdout)
         print("Sending broadcast push notification for device '{}' on channel '{}' and version '{}'".format(device, args.destination_channel, new_version))
         identifier = "{}/{}".format(args.destination_channel, device)
-        pushData = json.dumps({identifier: [new_version, ""]})
+        pushData = {identifier: [new_version, '']}
         expiresTime = datetime.datetime.now() + datetime.timedelta(days=1)
         r = requests.post(
             PUSH_BROADCAST_URL,
