@@ -83,6 +83,7 @@ parser.add_argument("--verbose", "-v", action="count", default=0)
 parser.add_argument("--dry", "-d", help="Do a dry run", action="store_true")
 parser.add_argument("-l", "--label", type=str, action="append",
                     help="Github label blocker to check for (default: 'critical (rc),critical (devel)')")
+parser.add_argument("-q", "--push-notify", action="store_true", default=False)
 
 args = parser.parse_args()
 
@@ -143,6 +144,8 @@ copyImageArgs = [args.copy_images_script, args.source_channel, args.destination_
 
 copyImageArgs2 = []
 
+if args.push_notify:
+    copyImageArgs2 += ["-q"]
 if args.version:
     copyImageArgs2 += ["-r", str(args.version)]
 if args.offset:
