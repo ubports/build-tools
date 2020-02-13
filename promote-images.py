@@ -184,10 +184,10 @@ for device in devices:
         print("Sending broadcast push notification for device '{}' on channel '{}' and version '{}'".format(device, args.destination_channel, new_version))
         identifier = "{}/{}".format(args.destination_channel, device)
         pushData = {identifier: [new_version, '']}
-        expiresTime = datetime.datetime.now() + datetime.timedelta(days=1)
+        expiresTime = datetime.datetime.utcnow() + datetime.timedelta(days=1)
         r = requests.post(
             PUSH_BROADCAST_URL,
-            data=PUSH_DATA % (expiresTime.isoformat(), pushData),
+            data=PUSH_DATA % (expiresTime.replace(microsecond=0).isoformat()+"Z", pushData),
             headers={'content-type': 'application/json'})
         if r.status_code != 200:
             print("WARNING: Push notification failed with: \nHTTP {}\n{}\n".format(r.status_code, r.text))
