@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # Copyright (C) 2017 Marius Gripsgard <marius@ubports.com>
 #
 # This program is free software: you can redistribute it and/or modify
@@ -70,7 +72,7 @@ fi
 
 # Multi dist build for "master" only
 # We might want to expand this to allow PR's to build like this
-if [ "$GIT_BRANCH" == "master" ]; then
+if [ "$GIT_BRANCH" = "master" ]; then
   echo "Doing multi build!"
   for d in $MULTI_DIST ; do
     echo "Gen git snapshot for $d"
