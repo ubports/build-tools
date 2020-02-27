@@ -24,7 +24,6 @@ REPO_BASE = "http://repo.ubports.com/"
 
 DEB_SOURCE_TEMPLATE = "deb %s %s main"
 CHECK_TEMPLATE = "%sdists/%s/Release"
-VALID_ARCH = ["armhf", "arm64", "amd64"]
 
 MAIN = "http://archive.ubuntu.com/ubuntu/"
 PORTS = "http://ports.ubuntu.com/ubuntu-ports/"
@@ -36,14 +35,14 @@ def repo_exist(repo, base=REPO_BASE):
     return r.status_code == 200
 
 
-def get_branch():
-    if not os.path.isfile("branch.buildinfo"):
-        print("ERROR: branch.buildinfo does not exist!")
+def get_target_apt_repository():
+    if not os.path.isfile("ubports.target_apt_repository.buildinfo"):
+        print("ERROR: ubports.target_apt_repository.buildinfo does not exist!")
         sys.exit(1)
         return
-    with open("branch.buildinfo") as f:
-        branch = f.read()
-    return branch.strip()
+    with open("ubports.target_apt_repository.buildinfo") as f:
+        target_apt_repository = f.read()
+    return target_apt_repository.strip()
 
 
 def ubports_depends_exist():
@@ -74,75 +73,39 @@ def get_ubports_depends():
     depend = [x.strip() for x in depend]
     return depend
 
+def is_extension(target_apt_repository):
+    return "_-_" in target_apt_repository
 
-def is_arch_ext(branch):
-    return "@" in branch
-
-
-def arch_extension_get_base_branch(branch):
-    if not is_arch_ext(branch):
+def extension_get_repos(target_apt_repository):
+    if not is_extension(target_apt_repository):
         return
-    return branch.split("@")[0]
-
-
-def arch_extension_get_arch(branch):
-    if not is_arch_ext(branch):
-        return
-    return branch.split("@")[-1]
-
-
-def is_arch_valid(arch):
-    return arch in VALID_ARCH
-
-
-def is_extension(branch):
-    return "_-_" in branch
-
-
-def extension_get_repos(branch):
-    if not is_extension(branch):
-        return
-    split_list = branch.split("_-_")
-    branches = [split_list[0]]
+    split_list = target_apt_repository.split("_-_")
+    repos = [split_list[0]]
     for i in split_list[1:-1]:
-        branches.append("%s_-_%s" % (branches[-1], i))
-    return branches
+        repos.append("%s_-_%s" % (repos[-1], i))
+    return repos
 
 
 depends_list = []
 
-branch = get_branch()
+target_apt_repository = get_target_apt_repository()
 
 base = REPO_BASE
-if (branch.startswith("focal")):
+if (target_apt_repository.startswith("focal")):
     base = "http://repo2.ubports.com/"
 
 print(base)
-print(branch)
-
-# Extension arch
-if is_arch_ext(branch):
-    arch = arch_extension_get_arch(branch)
-    branch = arch_extension_get_base_branch(branch)
-    if is_arch_valid(arch):
-        print("Arch %s" % arch)
-        with open("ubports.architecture", "w") as f:
-            f.write(arch)
-        with open("branch.buildinfo", "w") as f:
-            f.write(branch)
-    else:
-        print("ERROR: Arch '%s' is not valid" % arch)
-        sys.exit(1)
+print(target_apt_repository)
 
 # Working repo
-if repo_exist(branch, base):
-    depends_list.append(branch)
+if repo_exist(target_apt_repository, base):
+    depends_list.append(target_apt_repository)
 else:
-    print("WARNING: branch repo '%s' does not exist, please ignore if this is a new branch" % branch)
+    print("WARNING: branch repo '%s' does not exist, please ignore if this is a new branch" % target_apt_repository)
 
 # Extension repo
-if is_extension(branch):
-    base_extensions = extension_get_repos(branch)
+if is_extension(target_apt_repository):
+    base_extensions = extension_get_repos(target_apt_repository)
     print(base_extensions)
     for base_extension in base_extensions:
         if repo_exist(base_extension, base):

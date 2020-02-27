@@ -63,9 +63,10 @@ if [ -f multidist.buildinfo ]; then
     cd $rootwp
 	done
 else
-  export release=$(cat branch.buildinfo)
-  export distribution=$(cat distribution.buildinfo)
-  export REPOS="$release"
+  release="$(cat ubports.target_apt_repository.buildinfo)"
+  distribution=$(cat distribution.buildinfo)
+  REPOS="$release"
+  export release distribution REPOS
 
   for suffix in gz bz2 xz deb dsc changes ddeb udeb buildinfo ; do
     mv *.${suffix} $BASE_PATH || true

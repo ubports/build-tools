@@ -21,6 +21,8 @@ MULTI_DIST="xenial bionic"
 
 DIST="vivid xenial artful bionic focal"
 
+VALID_ARCHS="armhf arm64 amd64"
+
 if [ ! "$SKIP_MOVE" = "true" ]; then
         tmp=$(mktemp -d)
         mv * .* $tmp/
@@ -92,13 +94,38 @@ else
   echo "Gen git snapshot done"
 fi
 
-echo "$GIT_BRANCH" > branch.buildinfo
+if [ -n "$CHANGE_ID" ]; then
+  # This is a PR. Publish each PR for each project into its own repository
+  GIT_REPO_NAME="$(basename "${GIT_URL%.git}")"
+  REPOS="PR/${GIT_REPO_NAME}/${CHANGE_ID}"
 
-# If this is a pull request, we want to also use the target repository for
-# dependency checking. To do so, add the name of the target branch (which is in
-# the CHANGE_TARGET environment variable) to the ubports.depends file.
-if [ -n "${CHANGE_TARGET}" ]; then
-  echo "${CHANGE_TARGET}" >> source/ubports.depends
+  # We want the target branch to be part of our repo dependency (in addition to
+  # what's specified in ubports.depends)
+  # TODO: support specifying PRs as a dependency in the PR body.
+
+  if [ -n "${CHANGE_TARGET}" ]; then
+    # Remove "ubports/" prefix if present
+    echo "${CHANGE_TARGET#ubports/}" >> source/ubports.depends
+  fi
+else
+  # Support both ubports/xenial(_-_.*)? and xenial(_-_.*)?
+  REPOS="${GIT_BRANCH#ubports/}"
+
+  # Parse branch architecture extension
+  if echo "$REPOS" | grep -q '@[a-z]*$'; then
+    REQUEST_ARCH="${REPOS#*@}"
+    REPOS="${REPOS%@*}"
+  fi
+fi
+
+echo "$REPOS" >ubports.target_apt_repository.buildinfo
+if [ -n "$REQUEST_ARCH" ]; then
+  if echo "$VALID_ARCHS" | grep -q "$REQUEST_ARCH"; then
+    echo "$REQUEST_ARCH" >ubports.architecture.buildinfo
+  else
+    echo "ERROR: Arch '${REQUEST_ARCH}' is not valid"
+    exit 1
+  fi
 fi
 
 if [ -f source/ubports.depends ]; then
