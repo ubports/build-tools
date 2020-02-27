@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # Copyright (C) 2017 Marius Gripsgard <marius@ubports.com>
 #
 # This program is free software: you can redistribute it and/or modify
