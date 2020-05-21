@@ -97,7 +97,7 @@ fi
 if [ -n "$CHANGE_ID" ]; then
   # This is a PR. Publish each PR for each project into its own repository
   GIT_REPO_NAME="$(basename "${GIT_URL%.git}")"
-  REPOS="PR/${GIT_REPO_NAME}/${CHANGE_ID}"
+  REPOS="PR_${GIT_REPO_NAME}_${CHANGE_ID}"
 
   # We want the target branch to be part of our repo dependency (in addition to
   # what's specified in ubports.depends)
