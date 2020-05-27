@@ -47,12 +47,12 @@ if [ -f multidist.buildinfo ]; then
       mv *.${suffix} $BASE_PATH || true
     done
 
-    if ! aptly repo show $release ; then
-      aptly repo create -distribution="$release" $release
-      aptly publish repo $release filesystem:repo:main
+    if ! aptly -db-open-attempts=40 repo show $release ; then
+      aptly -db-open-attempts=40 repo create -distribution="$release" $release
+      aptly -db-open-attempts=40 publish repo $release filesystem:repo:main
     fi
-    aptly repo include -no-remove-files -repo="$release" $BASE_PATH
-    aptly publish update $release filesystem:repo:main
+    aptly -db-open-attempts=40 repo include -no-remove-files -repo="$release" $BASE_PATH
+    aptly -db-open-attempts=40 publish update $release filesystem:repo:main
 
     # Freight hates non-standard files
     rm $BASE_PATH/*.ddeb $BASE_PATH/*.udeb || true
@@ -72,19 +72,19 @@ else
     mv *.${suffix} $BASE_PATH || true
   done
 
-  if ! aptly repo show $release ; then
-    aptly repo create -distribution="$release" $release
-    aptly publish repo $release filesystem:repo:main
+  if ! aptly -db-open-attempts=40 repo show $release ; then
+    aptly -db-open-attempts=40 repo create -distribution="$release" $release
+    aptly -db-open-attempts=40 publish repo $release filesystem:repo:main
   fi
 
   if echo $APTLY_ONLY | grep -w $release > /dev/null; then
-    aptly repo include -repo="$release" $BASE_PATH
-    aptly publish update -force-overwrite $release filesystem:repo:main
+    aptly -db-open-attempts=40 repo include -repo="$release" $BASE_PATH
+    aptly -db-open-attempts=40 publish update -force-overwrite $release filesystem:repo:main
     echo "$release is set to aptly only, im going to exit here :)"
     exit 0
   else
-    aptly repo include -no-remove-files -repo="$release" $BASE_PATH || true
-    aptly publish update -force-overwrite $release filesystem:repo:main
+    aptly -db-open-attempts=40 repo include -no-remove-files -repo="$release" $BASE_PATH || true
+    aptly -db-open-attempts=40 publish update -force-overwrite $release filesystem:repo:main
   fi
 
   # Freight hates non-standard files
