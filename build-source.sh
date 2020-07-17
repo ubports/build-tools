@@ -131,6 +131,8 @@ fi
 for file in \
     ubports.depends \
     ubports.no_test \
+    ubports.no_doc \
+    ubports.build_profiles \
     ubports.backports \
   ; do
   if [ -f source/$file ]; then
