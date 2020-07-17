@@ -20,12 +20,35 @@ set -ex
 export PYTHONIOENCODING=UTF-8
 export BUILD_ONLY=true
 
+# Parallel option is overwritten by build-and-provide-package anyway, but in
+# case we switch from it, let's leave it in.
+
+DEB_BUILD_OPTIONS="parallel=$(nproc)"
+DEB_BUILD_PROFILES=""
+
 if [ -f ubports.no_test.buildinfo ]; then
-	export DEB_BUILD_OPTIONS="parallel=$(nproc) nocheck"
+	DEB_BUILD_OPTIONS="${DEB_BUILD_OPTIONS} nocheck"
+	DEB_BUILD_PROFILES="${DEB_BUILD_PROFILES} nocheck"
+
 	rm ubports.no_test.buildinfo
-else
-	export DEB_BUILD_OPTIONS="parallel=$(nproc)"
 fi
+
+if [ -f ubports.no_doc.buildinfo ]; then
+	DEB_BUILD_OPTIONS="${DEB_BUILD_OPTIONS} nodoc"
+	DEB_BUILD_PROFILES="${DEB_BUILD_PROFILES} nodoc"
+
+	rm ubports.no_doc.buildinfo
+fi
+
+# Allow setting additional build profiles. Useful for bootstraping
+# circular dependencies.
+if [ -f ubports.build_profiles.buildinfo ]; then
+	DEB_BUILD_PROFILES="${DEB_BUILD_PROFILES} $(cat ubports.build_profiles.buildinfo)"
+
+	rm ubports.build_profiles.buildinfo
+fi
+
+export DEB_BUILD_OPTIONS DEB_BUILD_PROFILES
 
 if [ -f ubports.depends.buildinfo ]; then
 	mv ubports.depends.buildinfo ubports.depends

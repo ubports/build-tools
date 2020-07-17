@@ -90,7 +90,7 @@ if [ "$GIT_BRANCH" = "master" ]; then
   echo "$MULTI_DIST" > multidist.buildinfo
 else
   export TIMESTAMP_FORMAT="$d%Y%m%d%H%M%S"
-  # /usr/bin/generate-git-snapshot
+  /usr/bin/generate-git-snapshot
   echo "Gen git snapshot done"
 fi
 
@@ -131,6 +131,8 @@ fi
 for file in \
     ubports.depends \
     ubports.no_test \
+    ubports.no_doc \
+    ubports.build_profiles \
     ubports.backports \
   ; do
   if [ -f source/$file ]; then
