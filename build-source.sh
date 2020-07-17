@@ -90,7 +90,7 @@ if [ "$GIT_BRANCH" = "master" ]; then
   echo "$MULTI_DIST" > multidist.buildinfo
 else
   export TIMESTAMP_FORMAT="$d%Y%m%d%H%M%S"
-  /usr/bin/generate-git-snapshot
+  # /usr/bin/generate-git-snapshot
   echo "Gen git snapshot done"
 fi
 
@@ -128,12 +128,12 @@ if [ -n "$REQUEST_ARCH" ]; then
   fi
 fi
 
-if [ -f source/ubports.depends ]; then
-        cp source/ubports.depends ubports.depends.buildinfo
-fi
-if [ -f source/ubports.no_test ]; then
-        cp source/ubports.no_test ubports.no_test.buildinfo
-fi
-if [ -f source/ubports.backports ]; then
-        cp source/ubports.backports ubports.backports.buildinfo
-fi
+for file in \
+    ubports.depends \
+    ubports.no_test \
+    ubports.backports \
+  ; do
+  if [ -f source/$file ]; then
+    cp source/$file $file.buildinfo
+  fi
+done
