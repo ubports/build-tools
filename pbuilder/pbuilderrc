@@ -8,7 +8,7 @@
 PYTHONIOENCODING=UTF-8
 LC_CTYPE=en_US.UTF-8
 
-PBUILDERSATISFYDEPENDSCMD="/usr/lib/pbuilder/pbuilder-satisfydepends-gdebi"
+# PBUILDERSATISFYDEPENDSCMD="/usr/lib/pbuilder/pbuilder-satisfydepends-gdebi"
 
 
 # Ubuntu / Debian
@@ -44,7 +44,9 @@ else
 	  OTHERMIRROR="deb http://old-releases.ubuntu.com/ubuntu vivid-security main restricted universe multiverse"
 	fi
 
-	if [ "$DIST" != "artful" ] && [ "$DIST" != "bionic" ]; then
-		EXTRAPACKAGES="pkg-create-dbgsym"
+	if [ "$DIST" == "xenial" ]; then
+		EXTRAPACKAGES="pkg-create-dbgsym eatmydata ca-certificates"
+	else
+		EXTRAPACKAGES="eatmydata ca-certificates"
 	fi
 fi
