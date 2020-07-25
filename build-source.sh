@@ -17,9 +17,11 @@
 
 
 # Multi distro, set here to build master for multripple distros!
-MULTI_DIST="xenial bionic"
+BUILD_DISTS_MULTI="xenial focal"
 
-DIST="vivid xenial artful bionic focal"
+VALID_DISTS_UBUNTU="xenial bionic focal groovy"
+VALID_DISTS_DEBIAN="buster bullseye sid"
+VALID_DISTS="$VALID_DISTS_UBUNTU $VALID_DISTS_DEBIAN"
 
 VALID_ARCHS="armhf arm64 amd64"
 
@@ -59,13 +61,9 @@ if [ -f source/ubports.source_location ]; then
   rm source/ubports.source_location || true
 fi
 
-if echo $DIST | grep -w $GIT_BRANCH > /dev/null; then
+if echo $VALID_DISTS | grep -w $GIT_BRANCH > /dev/null; then
         echo "This is on a release branch, overriding dist to $GIT_BRANCH"
         export DIST_OVERRIDE=$GIT_BRANCH
-fi
-if echo "vivid-dev" | grep -w $GIT_BRANCH > /dev/null; then
-        echo "This is on a release branch, overriding dist to vivid"
-        export DIST_OVERRIDE="vivid"
 fi
 if echo "xenial-dev" | grep -w $GIT_BRANCH > /dev/null; then
         echo "This is on a release branch, overriding dist to xenial"
@@ -76,7 +74,7 @@ fi
 # We might want to expand this to allow PR's to build like this
 if [ "$GIT_BRANCH" = "master" ]; then
   echo "Doing multi build!"
-  for d in $MULTI_DIST ; do
+  for d in $BUILD_DISTS_MULTI ; do
     echo "Gen git snapshot for $d"
     export TIMESTAMP_FORMAT="$d%Y%m%d%H%M%S"
     export DIST_OVERRIDE="$d"
@@ -87,7 +85,7 @@ if [ "$GIT_BRANCH" = "master" ]; then
     unset DIST_OVERRIDE
   done
   tar -zcvf multidist.tar.gz mbuild
-  echo "$MULTI_DIST" > multidist.buildinfo
+  echo "$BUILD_DISTS_MULTI" > multidist.buildinfo
 else
   export TIMESTAMP_FORMAT="$d%Y%m%d%H%M%S"
   /usr/bin/generate-git-snapshot
