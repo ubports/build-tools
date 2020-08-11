@@ -52,9 +52,14 @@ def call(Boolean isArchIndependent = false) {
       stage('Results') {
         steps {
           cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
-          unstash 'build-armhf'
           unstash 'build-arm64'
-          unstash 'build-amd64'
+          // If statement can only be evaluated under a script stage.
+          script {
+            if (!isArchIndependent) {
+              unstash 'build-armhf'
+              unstash 'build-amd64'
+            }
+          }
           archiveArtifacts(artifacts: archiveFileList, fingerprint: true, onlyIfSuccessful: true)
           sh '''/usr/bin/build-repo.sh'''
         }
