@@ -12,7 +12,7 @@ def call(Boolean isArchIndependent = false) {
           cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
         }
       }
-      stage('Build binary - armhf') {
+      stage('Build binary') {
         steps {
           parallel(
             "Build binary - armhf": {
