@@ -13,36 +13,37 @@ def call(Boolean isArchIndependent = false) {
         }
       }
       stage('Build binary') {
-        steps {
-          parallel(
-            "Build binary - armhf": {
-              node(label: 'arm64') {
-                cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
-                unstash 'source'
-                sh 'architecture="armhf" build-binary.sh'
-                stash(includes: stashFileList, name: 'build-armhf')
-                cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
-              }
-            },
-            "Build binary - arm64": {
-              node(label: 'arm64') {
-                cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
-                unstash 'source'
-                sh 'architecture="arm64" build-binary.sh'
-                stash(includes: stashFileList, name: 'build-arm64')
-                cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
-              }
-            },
-            "Build binary - amd64": {
-              node(label: 'amd64') {
-                cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
-                unstash 'source'
-                sh 'architecture="amd64" build-binary.sh'
-                stash(includes: stashFileList, name: 'build-amd64')
-                cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
-              }
+        parallel {
+          stage('Build binary - armhf') {
+            agent { label 'arm64' }
+            steps {
+              cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
+              unstash 'source'
+              sh 'architecture="armhf" build-binary.sh'
+              stash(includes: stashFileList, name: 'build-armhf')
+              cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
             }
-          )
+          }
+          stage('Build binary - arm64') {
+            agent { label 'arm64' }
+            steps {
+              cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
+              unstash 'source'
+              sh 'architecture="arm64" build-binary.sh'
+              stash(includes: stashFileList, name: 'build-arm64')
+              cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
+            }
+          }
+          stage('Build binary - amd64') {
+            agent { label 'amd64' }
+            steps {
+              cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
+              unstash 'source'
+              sh 'architecture="amd64" build-binary.sh'
+              stash(includes: stashFileList, name: 'build-amd64')
+              cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
+            }
+          }
         }
       }
       stage('Results') {
