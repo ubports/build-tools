@@ -19,8 +19,7 @@ def call(Boolean isArchIndependent = false) {
               node(label: 'arm64') {
                 cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
                 unstash 'source'
-                sh '''export architecture="armhf"
-  build-binary.sh'''
+                sh 'architecture="armhf" build-binary.sh'
                 stash(includes: stashFileList, name: 'build-armhf')
                 cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
               }
@@ -29,8 +28,7 @@ def call(Boolean isArchIndependent = false) {
               node(label: 'arm64') {
                 cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
                 unstash 'source'
-                sh '''export architecture="arm64"
-      build-binary.sh'''
+                sh 'architecture="arm64" build-binary.sh'
                 stash(includes: stashFileList, name: 'build-arm64')
                 cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
               }
@@ -39,8 +37,7 @@ def call(Boolean isArchIndependent = false) {
               node(label: 'amd64') {
                 cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
                 unstash 'source'
-                sh '''export architecture="amd64"
-      build-binary.sh'''
+                sh 'architecture="amd64" build-binary.sh'
                 stash(includes: stashFileList, name: 'build-amd64')
                 cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
               }
