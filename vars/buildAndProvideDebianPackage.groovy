@@ -4,9 +4,14 @@ def call(Boolean isArchIndependent = false) {
 
   pipeline {
     agent any
+    options {
+      // Only 'Build source' stage requires checkout.
+      skipDefaultCheckout()
+    }
     stages {
       stage('Build source') {
         steps {
+          checkout scm
           sh '/usr/bin/build-source.sh'
           stash(name: 'source', includes: stashFileList)
           cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
@@ -18,7 +23,6 @@ def call(Boolean isArchIndependent = false) {
             agent { label 'arm64' }
             when { expression { return !isArchIndependent } }
             steps {
-              cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
               unstash 'source'
               sh 'architecture="armhf" build-binary.sh'
               stash(includes: stashFileList, name: 'build-armhf')
@@ -29,7 +33,6 @@ def call(Boolean isArchIndependent = false) {
             agent { label 'arm64' }
             // Always run; arch-independent packages are built here.
             steps {
-              cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
               unstash 'source'
               sh 'architecture="arm64" build-binary.sh'
               stash(includes: stashFileList, name: 'build-arm64')
@@ -40,7 +43,6 @@ def call(Boolean isArchIndependent = false) {
             agent { label 'amd64' }
             when { expression { return !isArchIndependent } }
             steps {
-              cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
               unstash 'source'
               sh 'architecture="amd64" build-binary.sh'
               stash(includes: stashFileList, name: 'build-amd64')
@@ -51,7 +53,6 @@ def call(Boolean isArchIndependent = false) {
       }
       stage('Results') {
         steps {
-          cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
           unstash 'build-arm64'
           // If statement can only be evaluated under a script stage.
           script {
