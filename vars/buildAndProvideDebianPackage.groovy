@@ -16,6 +16,7 @@ def call(Boolean isArchIndependent = false) {
         parallel {
           stage('Build binary - armhf') {
             agent { label 'arm64' }
+            when { expression { return !isArchIndependent } }
             steps {
               cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
               unstash 'source'
@@ -26,6 +27,7 @@ def call(Boolean isArchIndependent = false) {
           }
           stage('Build binary - arm64') {
             agent { label 'arm64' }
+            // Always run; arch-independent packages are built here.
             steps {
               cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
               unstash 'source'
@@ -36,6 +38,7 @@ def call(Boolean isArchIndependent = false) {
           }
           stage('Build binary - amd64') {
             agent { label 'amd64' }
+            when { expression { return !isArchIndependent } }
             steps {
               cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
               unstash 'source'
