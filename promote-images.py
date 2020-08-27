@@ -26,6 +26,58 @@ import time
 
 import requests
 
+def die(m):
+    print(m)
+    exit()
+
+def getChannelList(clist):
+    channels = []
+    if os.path.isfile(clist):
+        with open(clist) as f:
+            _channels = f.readlines()
+        for channel in _channels:
+            ch = channel.split("=>")
+            ch = [x.strip() for x in ch]
+            channels.append(ch)
+    else:
+        die("Channel list %s not found" % clist)
+
+    return channels
+
+def getMatchingDevices(source, dest):
+    dev = []
+    for device in source:
+        if device in dest:
+            dev.append(device)
+        else:
+            print("Did not find destination channel for {}".format(device))
+
+    for device in dest:
+        if not device in source:
+            print("Did not find source channel for {}".format(device))
+
+    print(dev)
+    return dev
+
+
+def getDevicesForAll(channels):
+    ret_channels = {}
+    index = requests.get("https://system-image.ubports.com/channels.json").json()
+
+    for channel in channels:
+        last = False
+
+        for chan in channel:
+            if not chan in index:
+                print("Did not find channel {}".format(channel))
+                continue
+
+            index_dev = index[chan]["devices"]
+            ret_channels[chan] = list(index_dev.keys())
+
+    return ret_channels
+
+
 def getLastTag(channel):
     tag = None
     index = requests.get("https://system-image.ubports.com/ubports-touch/16.04/%s/bacon/index.json" % channel)
@@ -63,9 +115,7 @@ def checkGithubLabel(label):
 
 parser = argparse.ArgumentParser(description='I promote images!')
 parser.add_argument("copy_images_script", metavar="COPY-IMAGES-SCRIPT")
-parser.add_argument("source_channel", metavar="SOURCE-CHANNEL")
-parser.add_argument("destination_channel", metavar="DESTINATION-CHANNEL")
-parser.add_argument("device_list", metavar="DEVICE-LIST")
+parser.add_argument("channel_list", metavar="CHANNEL-LIST")
 parser.add_argument("-r", "--version", type=int)
 parser.add_argument("-o", "--offset", type=int, help="Version offset")
 parser.add_argument("-k", "--keep-version", action="store_true",
@@ -87,8 +137,6 @@ parser.add_argument("-q", "--push-notify", action="store_true", default=False)
 
 args = parser.parse_args()
 
-devices = []
-
 # Workaround for python bug 16399
 if not args.label:
     args.label = ["critical (devel)", "critical (rc)"]
@@ -104,13 +152,8 @@ if not os.path.isfile(args.copy_images_script):
     if not args.dry:
         exit()
 
-if os.path.isfile(args.device_list):
-    with open(args.device_list) as f:
-        devices = f.readlines()
-    devices = [x.strip() for x in devices]
-else:
-    print("Device list %s not found" % args.device_list)
-    exit()
+channels = getChannelList(args.channel_list)
+devices_in_channels = getDevicesForAll(channels)
 
 new_tag = None
 
@@ -127,7 +170,6 @@ if args.tag_weekly:
                 new_tag = "%s/%i" % (new_tag, int(ltag[1])+1)
     print("Setting tag to %s" % new_tag)
 
-
 if args.tag_ota:
     last_tag = getLastTag("stable")
     if last_tag:
@@ -140,7 +182,7 @@ if args.tag_ota:
                 exit()
     new_tag = "OTA-%s" % args.tag_ota
 
-copyImageArgs = [args.copy_images_script, args.source_channel, args.destination_channel]
+copyImageArgs = [args.copy_images_script]
 
 copyImageArgs2 = []
 
@@ -165,13 +207,28 @@ if args.verbose and args.verbose != 0:
         a += "v"
     copyImageArgs2 += [a]
 
-for device in devices:
-    cmd = copyImageArgs + [device] + copyImageArgs2
-    print("Promoting %s to %s from %s" % (device, args.destination_channel, args.source_channel))
-    if args.dry:
-        print(cmd)
-    else:
-        result = subprocess.run(cmd)
-        if result.returncode != 0:
-            print("Error during execution of copy-image, result might be broken!")
-            sys.exit(result.returncode)
+for channel in channels:
+    source_channel = channel[0]
+    destination_channel = channel[1]
+    if not source_channel in devices_in_channels:
+        print("Didn't find any source channel named {}".format(source_channel))
+    if not destination_channel in devices_in_channels:
+        print("Didn't find any destination channel named {}".format(destination_channel))
+
+    src_devices = devices_in_channels[source_channel]
+    dest_devices = devices_in_channels[destination_channel]
+
+    devices = getMatchingDevices(src_devices, dest_devices)
+
+    print("Promoting channel {} from {}".format(destination_channel, source_channel))
+
+    for device in devices:
+        cmd = copyImageArgs + [source_channel, destination_channel, device] + copyImageArgs2
+        print("Promoting %s to %s from %s" % (device, destination_channel, source_channel))
+        if args.dry:
+            print(cmd)
+        else:
+            result = subprocess.run(cmd)
+            if result.returncode != 0:
+                print("Error during execution of copy-image, result might be broken!")
+                sys.exit(result.returncode)
