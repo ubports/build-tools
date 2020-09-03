@@ -61,6 +61,20 @@ if [ -f source/ubports.source_location ]; then
   rm source/ubports.source_location || true
 fi
 
+# Files controlling the build process under UBports CI.
+for file in \
+    ubports.depends \
+    ubports.no_test \
+    ubports.no_doc \
+    ubports.build_profiles \
+    ubports.backports \
+  ; do
+  if [ -f source/$file ]; then
+    # Move them out of the way so that dpkg-buildpackage won't trip.
+    mv source/$file $file.buildinfo
+  fi
+done
+
 if echo $VALID_DISTS | grep -w $GIT_BRANCH > /dev/null; then
         echo "This is on a release branch, overriding dist to $GIT_BRANCH"
         export DIST_OVERRIDE=$GIT_BRANCH
@@ -125,15 +139,3 @@ if [ -n "$REQUEST_ARCH" ]; then
     exit 1
   fi
 fi
-
-for file in \
-    ubports.depends \
-    ubports.no_test \
-    ubports.no_doc \
-    ubports.build_profiles \
-    ubports.backports \
-  ; do
-  if [ -f source/$file ]; then
-    cp source/$file $file.buildinfo
-  fi
-done
