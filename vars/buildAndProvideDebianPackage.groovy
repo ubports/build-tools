@@ -33,7 +33,7 @@ def call(Boolean isArchIndependent = false) {
           }
           stage('Build binary - arm64') {
             agent { label 'arm64' }
-            // Always run; arch-independent packages are built here.
+            when { expression { return !isArchIndependent } }
             steps {
               unstash 'source'
               sh 'architecture="arm64" build-binary.sh'
@@ -43,7 +43,7 @@ def call(Boolean isArchIndependent = false) {
           }
           stage('Build binary - amd64') {
             agent { label 'amd64' }
-            when { expression { return !isArchIndependent } }
+            // Always run; arch-independent packages are built here.
             steps {
               unstash 'source'
               sh 'architecture="amd64" build-binary.sh'
@@ -55,12 +55,12 @@ def call(Boolean isArchIndependent = false) {
       }
       stage('Results') {
         steps {
-          unstash 'build-arm64'
+          unstash 'build-amd64'
           // If statement can only be evaluated under a script stage.
           script {
             if (!isArchIndependent) {
+              unstash 'build-arm64'
               unstash 'build-armhf'
-              unstash 'build-amd64'
             }
           }
           archiveArtifacts(artifacts: archiveFileList, fingerprint: true, onlyIfSuccessful: true)
