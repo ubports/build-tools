@@ -117,7 +117,7 @@ if [ -n "$CHANGE_ID" ]; then
 
   if [ -n "${CHANGE_TARGET}" ]; then
     # Remove "ubports/" prefix if present
-    echo "${CHANGE_TARGET#ubports/}" >> source/ubports.depends
+    echo "${CHANGE_TARGET#ubports/}" >> ubports.depends.buildinfo
   fi
 else
   # Support both ubports/xenial(_-_.*)? and xenial(_-_.*)?
