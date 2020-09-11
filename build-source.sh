@@ -29,6 +29,9 @@ if [ ! "$SKIP_MOVE" = "true" ]; then
         tmp=$(mktemp -d)
         mv * .* $tmp/
         mv $tmp ./source
+else
+        # Simulate PRE_CLEANUP, because we'll skip it later.
+        rm -fv ./* || true # Note, not including directories
 fi
 
 ls source
@@ -55,7 +58,6 @@ if [ -f source/ubports.source_location ]; then
   export IGNORE_GIT_BUILDPACKAGE=true
   export USE_ORIG_VERSION=true
   export SKIP_DCH=true
-  export SKIP_PRE_CLEANUP=true
   export SKIP_GIT_CLEANUP=true
   rm source/Jenkinsfile || true
   rm source/ubports.source_location || true
@@ -74,6 +76,9 @@ for file in \
     mv source/$file $file.buildinfo
   fi
 done
+
+# Skip pre cleanup, otherwise all files moved above will be deleted.
+export SKIP_PRE_CLEANUP=true
 
 if echo $VALID_DISTS | grep -w $GIT_BRANCH > /dev/null; then
         echo "This is on a release branch, overriding dist to $GIT_BRANCH"
