@@ -114,11 +114,15 @@ if [ "$GIT_BRANCH" = "master" ]; then
   for d in $BUILD_DISTS_MULTI ; do
     echo "Gen git snapshot for $d"
     export TIMESTAMP_FORMAT="$d%Y%m%d%H%M%S"
-    export DIST_OVERRIDE="$d"
+    export DIST="$d"
+    # FIXME: remove this when we stop using our custom version of `generate-git-snapshot`
+    export DIST_OVERRIDE="$DIST"
     /usr/bin/generate-git-snapshot
     mkdir -p "mbuild/$d"
     mv *+0~$d* "mbuild/$d"
     unset TIMESTAMP_FORMAT
+    unset DIST
+    # FIXME: remove this when we stop using our custom version of `generate-git-snapshot`
     unset DIST_OVERRIDE
   done
   tar -zcvf multidist.tar.gz mbuild
@@ -247,6 +251,11 @@ else
       exit 1
     fi
   fi
+
+  # Convey the distribution of choice (used by build-binary.sh).
+  # It was in our custom generate-git-snapshot, but now we bring it out so that
+  # we don't have to rely on hidden modification.
+  echo "$DIST" > distribution.buildinfo
 fi
 
 # Move buildinfos back to the workspace root, so that they'll be stashed.
