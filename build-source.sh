@@ -107,15 +107,6 @@ for file in \
   fi
 done
 
-if echo $VALID_DISTS | grep -w $GIT_BRANCH > /dev/null; then
-        echo "This is on a release branch, overriding dist to $GIT_BRANCH"
-        export DIST_OVERRIDE=$GIT_BRANCH
-fi
-if echo "xenial-dev" | grep -w $GIT_BRANCH > /dev/null; then
-        echo "This is on a release branch, overriding dist to xenial"
-        export DIST_OVERRIDE="xenial"
-fi
-
 # Multi dist build for "master" only
 # We might want to expand this to allow PR's to build like this
 if [ "$GIT_BRANCH" = "master" ]; then
@@ -162,7 +153,8 @@ else
 
     if [ -n "${CHANGE_TARGET}" ]; then
       # Remove "ubports/" prefix if present
-      echo "${CHANGE_TARGET#ubports/}" >> buildinfos/ubports.depends.buildinfo
+      CHANGE_TARGET_REPO="${CHANGE_TARGET#ubports/}"
+      echo "$CHANGE_TARGET_REPO" >> buildinfos/ubports.depends.buildinfo
     fi
   else
     # Support both ubports/xenial(_-_.*)? and xenial(_-_.*)?
@@ -174,6 +166,36 @@ else
       REPOS="${REPOS%@*}"
     fi
   fi
+
+  # Decides which distribution the snapshot is released to (affects base rootfs selection for building).
+  if [ -n "$CHANGE_ID" ]; then
+    branch_dist=${CHANGE_TARGET_REPO%%_-_*}
+  else
+    branch_dist=${REPOS%%_-_*}
+  fi
+  changelog_dist=$(dpkg-parsechangelog -l source/debian/changelog --show-field Distribution)
+
+  if ! echo "$VALID_DISTS" | grep -q -w "$branch_dist"; then
+    echo "Branch name (or merge target) does not contain valid distribution. Using distribution from changelog." \
+         "Note that repo dependencies might not work correctly."
+    DIST="$changelog_dist"
+  else
+    echo "Using distribution from branch name (or merge target)."
+    DIST="$branch_dist"
+
+    if [ "$changelog_dist" != "UNRELEASED" ] && [ "$changelog_dist" != "$branch_dist" ]; then
+      echo "Note: distribution in changelog (${changelog_dist}) does not match branch's distribution (${branch_dist})."
+    fi
+  fi
+
+  if ! echo "$VALID_DISTS" | grep -q -w "$DIST"; then
+    echo "ERROR: Distribution '${DIST}' is not a valid distribution for this CI."
+    exit 1
+  fi
+
+  export DIST
+  # FIXME: remove this when we stop using our custom version of `generate-git-snapshot`
+  export DIST_OVERRIDE="$DIST"
 
   export TIMESTAMP_FORMAT="$d%Y%m%d%H%M%S"
   /usr/bin/generate-git-snapshot
