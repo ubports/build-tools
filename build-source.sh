@@ -61,6 +61,8 @@ if [ -f source/ubports.source_location ]; then
   rm source/ubports.source_location || true
 fi
 
+mkdir tmp || true
+
 # Files controlling the build process under UBports CI.
 for file in \
     ubports.depends \
@@ -71,7 +73,7 @@ for file in \
   ; do
   if [ -f source/$file ]; then
     # Move them out of the way so that dpkg-buildpackage won't trip.
-    mv source/$file $file.buildinfo
+    mv source/$file tmp/$file.buildinfo
   fi
 done
 
@@ -105,6 +107,9 @@ else
   /usr/bin/generate-git-snapshot
   echo "Gen git snapshot done"
 fi
+
+mv tmp/* . || true
+rm -rf tmp || true
 
 if [ -n "$CHANGE_ID" ]; then
   # This is a PR. Publish each PR for each project into its own repository
