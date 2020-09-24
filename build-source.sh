@@ -87,9 +87,10 @@ if [ -n "$source_location_file" ]; then
   fi
 fi
 
-mkdir tmp || true
-
-# Files controlling the build process under UBports CI.
+# Move files controlling the build process under UBports CI to a directory.
+# This prevents dpkg-buildpackage from error out and generate-git-snapshot from
+# removing these files during there cleanup process.
+mkdir -p buildinfos
 for file in \
     ubports.depends \
     ubports.no_test \
@@ -102,7 +103,7 @@ for file in \
     # Move them out of the way so that dpkg-buildpackage won't trip.
     # (And to allow us to inspect the file without extracting debian package
     # in the next step)
-    mv "$existing_file" "tmp/${file}.buildinfo"
+    mv "$existing_file" "buildinfos/${file}.buildinfo"
   fi
 done
 
@@ -161,7 +162,7 @@ else
 
     if [ -n "${CHANGE_TARGET}" ]; then
       # Remove "ubports/" prefix if present
-      echo "${CHANGE_TARGET#ubports/}" >> tmp/ubports.depends.buildinfo
+      echo "${CHANGE_TARGET#ubports/}" >> buildinfos/ubports.depends.buildinfo
     fi
   else
     # Support both ubports/xenial(_-_.*)? and xenial(_-_.*)?
@@ -178,10 +179,10 @@ else
   /usr/bin/generate-git-snapshot
   echo "Gen git snapshot done"
 
-  echo "$REPOS" >tmp/ubports.target_apt_repository.buildinfo
+  echo "$REPOS" >buildinfos/ubports.target_apt_repository.buildinfo
   if [ -n "$REQUEST_ARCH" ]; then
     if echo "$VALID_ARCHS" | grep -q "$REQUEST_ARCH"; then
-      echo "$REQUEST_ARCH" >tmp/ubports.architecture.buildinfo
+      echo "$REQUEST_ARCH" >buildinfos/ubports.architecture.buildinfo
     else
       echo "ERROR: Arch '${REQUEST_ARCH}' is not valid"
       exit 1
@@ -189,5 +190,6 @@ else
   fi
 fi
 
-mv tmp/* . || true
-rm -rf tmp || true
+# Move buildinfos back to the workspace root, so that they'll be stashed.
+mv buildinfos/* . || true
+rm -rf buildinfos || true
