@@ -72,23 +72,22 @@ else
     mv *.${suffix} $BASE_PATH || true
   done
 
+  # Publish built packages to Aptly repo.
   if ! aptly -db-open-attempts=40 repo show $release ; then
     aptly -db-open-attempts=40 repo create -distribution="$release" $release
     aptly -db-open-attempts=40 publish repo $release filesystem:repo:main
   fi
 
-  if echo $APTLY_ONLY | grep -w $release > /dev/null; then
-    aptly -db-open-attempts=40 repo include -repo="$release" $BASE_PATH
-    aptly -db-open-attempts=40 publish update -force-overwrite $release filesystem:repo:main
-    echo "$release is set to aptly only, im going to exit here :)"
-    exit 0
-  else
-    aptly -db-open-attempts=40 repo include -no-remove-files -repo="$release" $BASE_PATH || true
-    aptly -db-open-attempts=40 publish update -force-overwrite $release filesystem:repo:main
+  # -no-remove-files leaves the files on the disk, so that we can also publish
+  # them to Freight repo.
+  aptly -db-open-attempts=40 repo include -no-remove-files -repo="$release" $BASE_PATH
+  aptly -db-open-attempts=40 publish update -force-overwrite $release filesystem:repo:main
+
+  if ! echo $APTLY_ONLY | grep -qw $release; then
+    # Also publish to Freight repo. Freight is unable to handle .{d,u}deb files,
+    # so they have to be removed.
+    rm $BASE_PATH/*.ddeb $BASE_PATH/*.udeb || true
+
+    /usr/bin/build-and-provide-package
   fi
-
-  # Freight hates non-standard files
-  rm $BASE_PATH/*.ddeb $BASE_PATH/*.udeb || true
-
-	/usr/bin/build-and-provide-package
 fi
