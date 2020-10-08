@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Copyright (C) 2017 Marius Gripsgard <marius@ubports.com>
 #
@@ -17,78 +17,40 @@
 
 set -xe
 
-mkdir -p binaries
-
-export PROVIDE_ONLY=true
-export SUDO_CMD=sudo
-export BASE_PATH="binaries/"
-export APTLY_ONLY="focal"
-
 # Aptly does not need sudo, as the jenkins user is in the aptly group
 
-if [ -f multidist.buildinfo ]; then
-	echo "Doing multibuild"
-	MULTI_DIST=$(cat multidist.buildinfo)
-  for t in multidist*.tar.gz ; do
-    tar --overwrite -xvzf $t
-  done
-	rm multidist*.tar.gz || true
-  export rootwp=$(pwd)
+push_aptly() {
+    local release="$1"
+    local path="$2"
 
-	for d in $MULTI_DIST ; do
-		echo "Repo-ing for $d"
-		export distribution="$d"
-    export release="$d"
-    export REPOS="$release"
-    export WORKSPACE="$rootwp/mbuild/$d"
-    cd "$WORKSPACE"
-    mkdir $BASE_PATH || true
-    for suffix in gz bz2 xz deb dsc changes ddeb udeb buildinfo ; do
-      mv *.${suffix} $BASE_PATH || true
-    done
+    echo "[APT] Pushing packages to $release repo"
 
     if ! aptly -db-open-attempts=40 repo show $release ; then
       aptly -db-open-attempts=40 repo create -distribution="$release" $release
       aptly -db-open-attempts=40 publish repo $release filesystem:repo:main
     fi
-    aptly -db-open-attempts=40 repo include -no-remove-files -repo="$release" $BASE_PATH
+    aptly -db-open-attempts=40 repo include -repo="$release" "$path"
     aptly -db-open-attempts=40 publish update $release filesystem:repo:main
+}
 
-    # Freight hates non-standard files
-    rm $BASE_PATH/*.ddeb $BASE_PATH/*.udeb || true
-		/usr/bin/build-and-provide-package
-    for suffix in gz bz2 xz deb dsc change ; do
-      mv $BASE_PATH*.${suffix} $rootwp || true
-    done
-    cd $rootwp
-	done
-else
-  release="$(cat ubports.target_apt_repository.buildinfo)"
-  distribution=$(cat distribution.buildinfo)
-  REPOS="$release"
-  export release distribution REPOS
+if [ -f multidist.buildinfo ]; then
+  echo "[APT] Doing multi-dist push"
 
-  for suffix in gz bz2 xz deb dsc changes ddeb udeb buildinfo ; do
-    mv *.${suffix} $BASE_PATH || true
+  MULTI_DIST=$(cat multidist.buildinfo)
+  for t in multidist*.tar.gz ; do
+    tar --overwrite -xvzf $t
+    rm $t || true
   done
 
-  if ! aptly -db-open-attempts=40 repo show $release ; then
-    aptly -db-open-attempts=40 repo create -distribution="$release" $release
-    aptly -db-open-attempts=40 publish repo $release filesystem:repo:main
-  fi
+  for release in $MULTI_DIST ; do
+    workspace="$(pwd)/mbuild/$release"
 
-  if echo $APTLY_ONLY | grep -w $release > /dev/null; then
-    aptly -db-open-attempts=40 repo include -repo="$release" $BASE_PATH
-    aptly -db-open-attempts=40 publish update -force-overwrite $release filesystem:repo:main
-    echo "$release is set to aptly only, im going to exit here :)"
-    exit 0
-  else
-    aptly -db-open-attempts=40 repo include -no-remove-files -repo="$release" $BASE_PATH || true
-    aptly -db-open-attempts=40 publish update -force-overwrite $release filesystem:repo:main
-  fi
+    push_aptly "$release" "$workspace"
+  done
+else
+  echo "[APT] Doing single-dist push"
 
-  # Freight hates non-standard files
-  rm $BASE_PATH/*.ddeb $BASE_PATH/*.udeb || true
+  release="$(cat ubports.target_apt_repository.buildinfo)"
 
-	/usr/bin/build-and-provide-package
+  push_aptly "$release" "$(pwd)"
 fi
