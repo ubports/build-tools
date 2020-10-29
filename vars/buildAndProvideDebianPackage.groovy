@@ -7,13 +7,13 @@ def call(Boolean isArchIndependent = false) {
     options {
       // Only 'Build source' stage requires checkout.
       skipDefaultCheckout()
-      // Uses this together with SKIP_MOVE=true
-      checkoutToSubdirectory('source')
     }
     stages {
       stage('Build source') {
         steps {
-          checkout scm
+          dir('source') {
+            checkout scm
+          }
           sh 'SKIP_MOVE=true /usr/bin/build-source.sh'
           stash(name: 'source', includes: stashFileList)
           cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
