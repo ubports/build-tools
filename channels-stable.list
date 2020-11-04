@@ -1,3 +1,4 @@
 ubports-touch/16.04/rc => ubports-touch/16.04/stable
 16.04/arm64/hybris/rc => 16.04/arm64/hybris/stable
 16.04/armhf/hybris/rc => 16.04/armhf/hybris/stable
+16.04/arm64/android9/rc => 16.04/arm64/android9/stable
