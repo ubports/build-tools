@@ -36,7 +36,9 @@ def getChannelList(clist):
     if os.path.isfile(clist):
         with open(clist) as f:
             _channels = f.readlines()
-        channels = [x.strip() for x in _channels]
+        for channel in _channels:
+            ch = channel.split("=>")[1].strip()
+            channels.append(ch)
     else:
         die("Channel list %s not found" % clist)
 
