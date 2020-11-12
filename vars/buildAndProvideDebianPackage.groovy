@@ -3,13 +3,14 @@ def call(Boolean isArchIndependent = false) {
   String archiveFileList = '*.gz,*.bz2,*.xz,*.deb,*.ddeb,*.udeb,*.dsc,*.changes,*.buildinfo'
 
   pipeline {
-    agent any
+    agent none
     options {
       // Only 'Build source' stage requires checkout.
       skipDefaultCheckout()
     }
     stages {
       stage('Build source') {
+        agent { label 'amd64' }
         steps {
           dir('source') {
             checkout scm
@@ -19,7 +20,7 @@ def call(Boolean isArchIndependent = false) {
           cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
         }
       }
-      stage('Build binary') {
+      stage('Build binaries') {
         parallel {
           stage('Build binary - armhf') {
             agent { label 'arm64' }
@@ -54,6 +55,7 @@ def call(Boolean isArchIndependent = false) {
         }
       }
       stage('Results') {
+        agent { label 'amd64' }
         steps {
           unstash 'build-amd64'
           // If statement can only be evaluated under a script stage.
@@ -68,6 +70,7 @@ def call(Boolean isArchIndependent = false) {
         }
       }
       stage('Cleanup') {
+        agent { label 'amd64' }
         steps {
           cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
         }
