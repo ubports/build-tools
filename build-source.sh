@@ -113,7 +113,25 @@ rm -rf tmp || true
 
 if [ -n "$CHANGE_ID" ]; then
   # This is a PR. Publish each PR for each project into its own repository
-  GIT_REPO_NAME="$(basename "${GIT_URL%.git}")"
+
+  if [ -n "$GIT_URL" ]; then
+    echo "DEBUG: \$GIT_URL is ${GIT_URL}"
+  elif [ -n "$GIT_URL_1" ]; then
+    echo "DEBUG: Set \$GIT_URL to \$GIT_URL_1, which is ${GIT_URL_1}"
+    GIT_URL=$GIT_URL_1
+  else
+    GIT_URL=$( (cd source && git remote get-url origin) || true)
+    echo "DEBUG: Set \$GIT_URL to git repo's origin remote url, which is ${GIT_URL}"
+  fi
+
+  if [ -n "$GIT_URL" ]; then
+    GIT_REPO_NAME="$(basename "${GIT_URL%.git}")"
+  else
+    echo "Cannot determine git repo name. Try to use the job name instead." \
+         "May produce incorrect apt repository name."
+    GIT_REPO_NAME=$JOB_BASE_NAME
+  fi
+
   REPOS="PR_${GIT_REPO_NAME}_${CHANGE_ID}"
 
   # We want the target branch to be part of our repo dependency (in addition to
