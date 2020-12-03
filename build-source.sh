@@ -57,6 +57,13 @@ if [ -f source/ubports.source_location ]; then
   export SKIP_DCH=true
   export SKIP_PRE_CLEANUP=true
   export SKIP_GIT_CLEANUP=true
+  # Always include the original source in the .changes file.
+  # Ideally we should do this only when we have a new upstream version, but
+  # I'm too lazy to check if a source package is already in the repo.
+  # This is primarily to please Aptly, and Aptly seems to check for file
+  # duplication anyway. (see dpkg-genchanges manpage)
+  export DBP_EXTRA_OPTS="-sa"
+
   rm source/Jenkinsfile || true
   rm source/ubports.source_location || true
 fi
