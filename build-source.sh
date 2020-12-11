@@ -15,6 +15,21 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# Accepts file paths. Print the first file that exists, or nothing if none exists.
+first_existing_file () {
+  while [ -n "$1" ]; do
+    if [ -e "$1" ]; then
+      echo "$1"
+      return
+    fi
+
+    shift
+  done
+}
+
+sourcedebian_or_source () {
+  first_existing_file "source/debian/${1}" "source/${1}"
+}
 
 # Multi distro, set here to build master for multripple distros!
 BUILD_DISTS_MULTI="xenial focal"
@@ -43,14 +58,15 @@ export GIT_COMMIT=$(git rev-parse HEAD)
 export GIT_BRANCH=$BRANCH_NAME
 cd ..
 
-if [ -f source/ubports.source_location ]; then
+source_location_file=$(sourcedebian_or_source ubports.source_location)
+if [ -n "$source_location_file" ]; then
   while read -r SOURCE_URL && read -r SOURCE_FILENAME; do
     if [ -f "$SOURCE_FILENAME" ]; then
       rm "$SOURCE_FILENAME"
     fi
 
     wget -O "$SOURCE_FILENAME" "$SOURCE_URL"
-  done <source/ubports.source_location
+  done <"$source_location_file"
 
   export IGNORE_GIT_BUILDPACKAGE=true
   export USE_ORIG_VERSION=true
@@ -64,8 +80,11 @@ if [ -f source/ubports.source_location ]; then
   # duplication anyway. (see dpkg-genchanges manpage)
   export DBP_EXTRA_OPTS="-sa"
 
-  rm source/Jenkinsfile || true
-  rm source/ubports.source_location || true
+  rm "$source_location_file" || true
+  existing_file=$(sourcedebian_or_source Jenkinsfile)
+  if [ -n "$existing_file" ]; then
+    rm "$existing_file" || true
+  fi
 fi
 
 mkdir tmp || true
@@ -78,9 +97,12 @@ for file in \
     ubports.build_profiles \
     ubports.backports \
   ; do
-  if [ -f source/$file ]; then
+  existing_file=$(sourcedebian_or_source "$file")
+  if [ -n "$existing_file" ]; then
     # Move them out of the way so that dpkg-buildpackage won't trip.
-    mv source/$file tmp/$file.buildinfo
+    # (And to allow us to inspect the file without extracting debian package
+    # in the next step)
+    mv "$existing_file" "tmp/${file}.buildinfo"
   fi
 done
 
