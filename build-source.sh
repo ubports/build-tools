@@ -132,62 +132,62 @@ if [ "$GIT_BRANCH" = "master" ]; then
   tar -zcvf multidist.tar.gz mbuild
   echo "$BUILD_DISTS_MULTI" > multidist.buildinfo
 else
+  if [ -n "$CHANGE_ID" ]; then
+    # This is a PR. Publish each PR for each project into its own repository
+
+    if [ -n "$GIT_URL" ]; then
+      echo "DEBUG: \$GIT_URL is ${GIT_URL}"
+    elif [ -n "$GIT_URL_1" ]; then
+      echo "DEBUG: Set \$GIT_URL to \$GIT_URL_1, which is ${GIT_URL_1}"
+      GIT_URL=$GIT_URL_1
+    else
+      GIT_URL=$( (cd source && git remote get-url origin) || true)
+      echo "DEBUG: Set \$GIT_URL to git repo's origin remote url, which is ${GIT_URL}"
+    fi
+
+    if [ -n "$GIT_URL" ]; then
+      GIT_REPO_NAME="$(basename "${GIT_URL%.git}")"
+    else
+      echo "Cannot determine git repo name. Try to use the job name instead." \
+          "May produce incorrect apt repository name."
+      GIT_REPO_NAME=$JOB_BASE_NAME
+    fi
+
+    REPOS="PR_${GIT_REPO_NAME}_${CHANGE_ID}"
+
+    # We want the target branch to be part of our repo dependency (in addition to
+    # what's specified in ubports.depends)
+    # TODO: support specifying PRs as a dependency in the PR body.
+
+    if [ -n "${CHANGE_TARGET}" ]; then
+      # Remove "ubports/" prefix if present
+      echo "${CHANGE_TARGET#ubports/}" >> tmp/ubports.depends.buildinfo
+    fi
+  else
+    # Support both ubports/xenial(_-_.*)? and xenial(_-_.*)?
+    REPOS="${GIT_BRANCH#ubports/}"
+
+    # Parse branch architecture extension
+    if echo "$REPOS" | grep -q '@[a-z]*$'; then
+      REQUEST_ARCH="${REPOS#*@}"
+      REPOS="${REPOS%@*}"
+    fi
+  fi
+
   export TIMESTAMP_FORMAT="$d%Y%m%d%H%M%S"
   /usr/bin/generate-git-snapshot
   echo "Gen git snapshot done"
+
+  echo "$REPOS" >tmp/ubports.target_apt_repository.buildinfo
+  if [ -n "$REQUEST_ARCH" ]; then
+    if echo "$VALID_ARCHS" | grep -q "$REQUEST_ARCH"; then
+      echo "$REQUEST_ARCH" >tmp/ubports.architecture.buildinfo
+    else
+      echo "ERROR: Arch '${REQUEST_ARCH}' is not valid"
+      exit 1
+    fi
+  fi
 fi
 
 mv tmp/* . || true
 rm -rf tmp || true
-
-if [ -n "$CHANGE_ID" ]; then
-  # This is a PR. Publish each PR for each project into its own repository
-
-  if [ -n "$GIT_URL" ]; then
-    echo "DEBUG: \$GIT_URL is ${GIT_URL}"
-  elif [ -n "$GIT_URL_1" ]; then
-    echo "DEBUG: Set \$GIT_URL to \$GIT_URL_1, which is ${GIT_URL_1}"
-    GIT_URL=$GIT_URL_1
-  else
-    GIT_URL=$( (cd source && git remote get-url origin) || true)
-    echo "DEBUG: Set \$GIT_URL to git repo's origin remote url, which is ${GIT_URL}"
-  fi
-
-  if [ -n "$GIT_URL" ]; then
-    GIT_REPO_NAME="$(basename "${GIT_URL%.git}")"
-  else
-    echo "Cannot determine git repo name. Try to use the job name instead." \
-         "May produce incorrect apt repository name."
-    GIT_REPO_NAME=$JOB_BASE_NAME
-  fi
-
-  REPOS="PR_${GIT_REPO_NAME}_${CHANGE_ID}"
-
-  # We want the target branch to be part of our repo dependency (in addition to
-  # what's specified in ubports.depends)
-  # TODO: support specifying PRs as a dependency in the PR body.
-
-  if [ -n "${CHANGE_TARGET}" ]; then
-    # Remove "ubports/" prefix if present
-    echo "${CHANGE_TARGET#ubports/}" >> ubports.depends.buildinfo
-  fi
-else
-  # Support both ubports/xenial(_-_.*)? and xenial(_-_.*)?
-  REPOS="${GIT_BRANCH#ubports/}"
-
-  # Parse branch architecture extension
-  if echo "$REPOS" | grep -q '@[a-z]*$'; then
-    REQUEST_ARCH="${REPOS#*@}"
-    REPOS="${REPOS%@*}"
-  fi
-fi
-
-echo "$REPOS" >ubports.target_apt_repository.buildinfo
-if [ -n "$REQUEST_ARCH" ]; then
-  if echo "$VALID_ARCHS" | grep -q "$REQUEST_ARCH"; then
-    echo "$REQUEST_ARCH" >ubports.architecture.buildinfo
-  else
-    echo "ERROR: Arch '${REQUEST_ARCH}' is not valid"
-    exit 1
-  fi
-fi
