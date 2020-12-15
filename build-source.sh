@@ -69,10 +69,6 @@ if [ -n "$source_location_file" ]; then
   done <"$source_location_file"
 
   export IGNORE_GIT_BUILDPACKAGE=true
-  export USE_ORIG_VERSION=true
-  export SKIP_DCH=true
-  export SKIP_PRE_CLEANUP=true
-  export SKIP_GIT_CLEANUP=true
   # Always include the original source in the .changes file.
   # Ideally we should do this only when we have a new upstream version, but
   # I'm too lazy to check if a source package is already in the repo.
@@ -106,6 +102,10 @@ for file in \
     mv "$existing_file" "buildinfos/${file}.buildinfo"
   fi
 done
+
+# Skip git cleanup, or those files will come back and/or our modification
+# to debian/changelog will be overwritten (see below).
+export SKIP_GIT_CLEANUP=true
 
 # Multi dist build for "master" only
 # We might want to expand this to allow PR's to build like this
@@ -174,6 +174,7 @@ else
     branch_dist=${REPOS%%_-_*}
   fi
   changelog_dist=$(dpkg-parsechangelog -l source/debian/changelog --show-field Distribution)
+  changelog_version=$(dpkg-parsechangelog -l source/debian/changelog --show-field Version)
 
   if ! echo "$VALID_DISTS" | grep -q -w "$branch_dist"; then
     echo "Branch name (or merge target) does not contain valid distribution. Using distribution from changelog." \
@@ -197,7 +198,43 @@ else
   # FIXME: remove this when we stop using our custom version of `generate-git-snapshot`
   export DIST_OVERRIDE="$DIST"
 
+  is_releasing_repo=$(echo "$VALID_DISTS" | grep -q -w "$REPOS" && echo true || echo false)
+
+  # Versioning decision override for PR and releasing branch
+  if [ "$changelog_dist" = "UNRELEASED" ]; then
+    # If the repo we're publishing is the distro name by itself, we don't allow UNRELEASED change.
+    if $is_releasing_repo; then
+      echo "ERROR: trying to publish UNRELEASD version to a releasing repo \"${REPOS}\"."
+      exit 1
+    fi
+
+    # Make sure non-PR unreleased looks like PR unreleased. See below.
+    (cd source && debchange --newversion "${changelog_version}~prerelease" --force-bad-version -- "")
+  elif (cd source && git show --stat --pretty=format: HEAD|grep -q '^ debian/changelog '); then
+    # The last commit touch the changelog; assumes the it's the releasing commit
+    if $is_releasing_repo; then
+      # Special treatment for releasing repo; You release a version, and your version is being released!
+      # TODO: Should a non-releasing extension repos (e.g. xenial_-_gst-droid) receives this treatment too?
+      export SKIP_DCH=true
+    else
+      # A PR is, by definition, prerelease. Set the version as such so that when the released version comes
+      # out, this version won't trump the release. generate-git-snapshot will append the timestamp and git commit.
+      (cd source && debchange --newversion "${changelog_version}~prerelease" --force-bad-version -- "")
+    fi
+  else
+    if [ -n "$CHANGE_TARGET" ]; then
+      if (cd source && git diff --stat "${CHANGE_TARGET}..HEAD" | grep -q '^ debian/changelog '); then
+        echo "ERROR: this PR does not release with the last commit."
+        exit 1
+      fi
+    fi
+
+    # This repo does not increase the changelog version. Use generate-git-snapshot's normal snapshot versioning.
+    # This is done by leaving the Debian changelog alone.
+  fi
+
   export TIMESTAMP_FORMAT="$d%Y%m%d%H%M%S"
+  export UNRELEASED_APPEND_COMMIT=true
   /usr/bin/generate-git-snapshot
   echo "Gen git snapshot done"
 
