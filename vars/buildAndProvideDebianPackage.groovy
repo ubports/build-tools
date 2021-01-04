@@ -88,8 +88,10 @@ def call(Boolean isArchIndependent = false) {
         }
       }
       unstable {
-        if (env.BRANCH_NAME in productionBranches) {
-          telegramSend(message: "DEB build UNSTABLE, check ${JOB_URL}", chatId: telegramChatId)
+        script {
+          if (env.BRANCH_NAME in productionBranches) {
+            telegramSend(message: "DEB build UNSTABLE, check ${JOB_URL}", chatId: telegramChatId)
+          }
         }
       }
       failure {
