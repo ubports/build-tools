@@ -1,7 +1,7 @@
 def call(Boolean isArchIndependent = false) {
   String stashFileList = '*.gz,*.bz2,*.xz,*.deb,*.ddeb,*.udeb,*.dsc,*.changes,*.buildinfo,lintian.txt'
   String archiveFileList = '*.gz,*.bz2,*.xz,*.deb,*.ddeb,*.udeb,*.dsc,*.changes,*.buildinfo'
-
+  def productionBranches = ['xenial', 'master', 'xenial_-_edge', 'xenial_-_edge_-_android9', 'xenial_-_edge_-_pine', 'xenial_-_edge_-_wayland']
   pipeline {
     agent none
     options {
@@ -73,6 +73,34 @@ def call(Boolean isArchIndependent = false) {
         agent { label 'amd64' }
         steps {
           cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
+        }
+      }
+    }
+    post {
+      always {
+        deleteDir()
+      }
+      success {
+        script {
+          if (env.BRANCH_NAME in productionBranches && currentBuild?.getPreviousBuild()?.resultIsWorseOrEqualTo("UNSTABLE")) {
+            telegramSend(message: "DEB build FIXED", chatId: telegramChatId)
+          }
+        }
+      }
+      unstable {
+        if (env.BRANCH_NAME in productionBranches) {
+          telegramSend(message: "DEB build UNSTABLE, check ${JOB_URL}", chatId: telegramChatId)
+        }
+      }
+      failure {
+        script {
+          if (env.BRANCH_NAME in productionBranches) {
+            if (currentBuild?.getPreviousBuild()?.resultIsWorseOrEqualTo("FAILURE")) {
+              telegramSend(message: "DEB build NOT FIXED, check ${JOB_URL}", chatId: telegramChatId)
+            } else {
+              telegramSend(message: "DEB build FAILURE, check ${JOB_URL}", chatId: telegramChatId)
+            }
+          }
         }
       }
     }
