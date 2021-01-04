@@ -79,26 +79,32 @@ def call(Boolean isArchIndependent = false) {
     }
     post {
       success {
-        script {
-          if (env.BRANCH_NAME in productionBranches && currentBuild?.getPreviousBuild()?.resultIsWorseOrEqualTo("UNSTABLE")) {
-            telegramSend(message: "DEB build FIXED", chatId: telegramChatId)
+        node('master') {
+          script {
+            if (env.BRANCH_NAME in productionBranches && currentBuild?.getPreviousBuild()?.resultIsWorseOrEqualTo("UNSTABLE")) {
+              telegramSend(message: "DEB build FIXED", chatId: telegramChatId)
+            }
           }
         }
       }
       unstable {
-        script {
-          if (env.BRANCH_NAME in productionBranches) {
-            telegramSend(message: "DEB build UNSTABLE, check ${JOB_URL}", chatId: telegramChatId)
+        node('master') {
+          script {
+            if (env.BRANCH_NAME in productionBranches) {
+              telegramSend(message: "DEB build UNSTABLE, check ${JOB_URL}", chatId: telegramChatId)
+            }
           }
         }
       }
       failure {
-        script {
-          if (env.BRANCH_NAME in productionBranches) {
-            if (currentBuild?.getPreviousBuild()?.resultIsWorseOrEqualTo("FAILURE")) {
-              telegramSend(message: "DEB build NOT FIXED, check ${JOB_URL}", chatId: telegramChatId)
-            } else {
-              telegramSend(message: "DEB build FAILURE, check ${JOB_URL}", chatId: telegramChatId)
+        node('master') {
+          script {
+            if (env.BRANCH_NAME in productionBranches) {
+              if (currentBuild?.getPreviousBuild()?.resultIsWorseOrEqualTo("FAILURE")) {
+                telegramSend(message: "DEB build NOT FIXED, check ${JOB_URL}", chatId: telegramChatId)
+              } else {
+                telegramSend(message: "DEB build FAILURE, check ${JOB_URL}", chatId: telegramChatId)
+              }
             }
           }
         }
