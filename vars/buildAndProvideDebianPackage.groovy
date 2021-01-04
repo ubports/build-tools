@@ -78,9 +78,6 @@ def call(Boolean isArchIndependent = false) {
       }
     }
     post {
-      always {
-        deleteDir()
-      }
       success {
         script {
           if (env.BRANCH_NAME in productionBranches && currentBuild?.getPreviousBuild()?.resultIsWorseOrEqualTo("UNSTABLE")) {
