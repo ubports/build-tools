@@ -81,10 +81,12 @@ def call(Boolean isArchIndependent = false) {
       success {
         node('master') {
           script {
-            if (env.BRANCH_NAME in productionBranches && currentBuild?.getPreviousBuild()?.resultIsWorseOrEqualTo("UNSTABLE")) {
-              telegramSend(message: "DEB build of ${JOB_NAME}: **FIXED**", chatId: telegramChatId)
-            } else {
-              telegramSend(message: "DEB build of ${JOB_NAME}: **SUCCESS**", chatId: telegramChatId)
+            if (env.BRANCH_NAME in productionBranches) {
+              if (currentBuild?.getPreviousBuild()?.resultIsWorseOrEqualTo("UNSTABLE")) {
+                telegramSend(message: "DEB build of ${JOB_NAME}: **FIXED**", chatId: telegramChatId)
+              } else {
+                telegramSend(message: "DEB build of ${JOB_NAME}: **SUCCESS**", chatId: telegramChatId)
+              }
             }
           }
         }
