@@ -47,12 +47,12 @@ if [ -f multidist.buildinfo ]; then
       mv *.${suffix} $BASE_PATH || true
     done
 
-    if ! aptly -db-open-attempts=40 repo show $release ; then
-      aptly -db-open-attempts=40 repo create -distribution="$release" $release
-      aptly -db-open-attempts=40 publish repo $release filesystem:repo:main
+    if ! aptly -db-open-attempts=400 repo show $release ; then
+      aptly -db-open-attempts=400 repo create -distribution="$release" $release
+      aptly -db-open-attempts=400 publish repo $release filesystem:repo:main
     fi
-    aptly -db-open-attempts=40 repo include -no-remove-files -repo="$release" $BASE_PATH
-    aptly -db-open-attempts=40 publish update $release filesystem:repo:main
+    aptly -db-open-attempts=400 repo include -no-remove-files -repo="$release" $BASE_PATH
+    aptly -db-open-attempts=400 publish update $release filesystem:repo:main
 
     # Freight hates non-standard files
     rm $BASE_PATH/*.ddeb $BASE_PATH/*.udeb || true
@@ -73,15 +73,15 @@ else
   done
 
   # Publish built packages to Aptly repo.
-  if ! aptly -db-open-attempts=40 repo show $release ; then
-    aptly -db-open-attempts=40 repo create -distribution="$release" $release
-    aptly -db-open-attempts=40 publish repo $release filesystem:repo:main
+  if ! aptly -db-open-attempts=400 repo show $release ; then
+    aptly -db-open-attempts=400 repo create -distribution="$release" $release
+    aptly -db-open-attempts=400 publish repo $release filesystem:repo:main
   fi
 
   # -no-remove-files leaves the files on the disk, so that we can also publish
   # them to Freight repo.
-  aptly -db-open-attempts=40 repo include -no-remove-files -repo="$release" $BASE_PATH
-  aptly -db-open-attempts=40 publish update -force-overwrite $release filesystem:repo:main
+  aptly -db-open-attempts=400 repo include -no-remove-files -repo="$release" $BASE_PATH
+  aptly -db-open-attempts=400 publish update -force-overwrite $release filesystem:repo:main
 
   if ! echo $APTLY_ONLY | grep -qw $release; then
     # Also publish to Freight repo. Freight is unable to handle .{d,u}deb files,
