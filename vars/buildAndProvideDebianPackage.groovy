@@ -13,12 +13,17 @@ def call(Boolean isArchIndependent = false) {
       stage('Build source') {
         agent { label 'amd64' }
         steps {
+          deleteDir()
           dir('source') {
             checkout scm
           }
           sh 'SKIP_MOVE=true /usr/bin/build-source.sh'
           stash(name: 'source', includes: stashFileList)
-          cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
+        }
+        post {
+          cleanup {
+            deleteDir() /* clean up our workspace */
+          }
         }
       }
       stage('Build binaries') {
@@ -27,30 +32,45 @@ def call(Boolean isArchIndependent = false) {
             agent { label 'arm64' }
             when { expression { return !isArchIndependent } }
             steps {
+              deleteDir()
               unstash 'source'
               sh 'architecture="armhf" build-binary.sh'
               stash(includes: stashFileList, name: 'build-armhf')
-              cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
+            }
+            post {
+              cleanup {
+                deleteDir() /* clean up our workspace */
+              }
             }
           }
           stage('Build binary - arm64') {
             agent { label 'arm64' }
             when { expression { return !isArchIndependent } }
             steps {
+              deleteDir()
               unstash 'source'
               sh 'architecture="arm64" build-binary.sh'
               stash(includes: stashFileList, name: 'build-arm64')
-              cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
+            }
+            post {
+              cleanup {
+                deleteDir() /* clean up our workspace */
+              }
             }
           }
           stage('Build binary - amd64') {
             agent { label 'amd64' }
             // Always run; arch-independent packages are built here.
             steps {
+              deleteDir()
               unstash 'source'
               sh 'architecture="amd64" build-binary.sh'
               stash(includes: stashFileList, name: 'build-amd64')
-              cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
+            }
+            post {
+              cleanup {
+                deleteDir() /* clean up our workspace */
+              }
             }
           }
         }
@@ -58,6 +78,7 @@ def call(Boolean isArchIndependent = false) {
       stage('Results') {
         agent { label 'amd64' }
         steps {
+          deleteDir()
           unstash 'build-amd64'
           // If statement can only be evaluated under a script stage.
           script {
@@ -69,11 +90,10 @@ def call(Boolean isArchIndependent = false) {
           archiveArtifacts(artifacts: archiveFileList, fingerprint: true, onlyIfSuccessful: true)
           sh '''/usr/bin/build-repo.sh'''
         }
-      }
-      stage('Cleanup') {
-        agent { label 'amd64' }
-        steps {
-          cleanWs(cleanWhenAborted: true, cleanWhenFailure: true, cleanWhenNotBuilt: true, cleanWhenSuccess: true, cleanWhenUnstable: true, deleteDirs: true)
+        post {
+          cleanup {
+            deleteDir() /* clean up our workspace */
+          }
         }
       }
     }
