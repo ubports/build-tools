@@ -24,6 +24,9 @@ export SUDO_CMD=sudo
 export BASE_PATH="binaries/"
 export APTLY_ONLY="focal"
 
+# Make sure we clean up before we continue
+rm $BASE_PATH/* || true
+
 # Aptly does not need sudo, as the jenkins user is in the aptly group
 
 if [ -f multidist.buildinfo ]; then
@@ -91,3 +94,9 @@ else
     /usr/bin/build-and-provide-package
   fi
 fi
+
+# Cleanup
+rm $BASE_PATH/* || true
+for suffix in gz bz2 xz deb dsc changes ddeb udeb buildinfo ; do
+    rm *.${suffix} || true
+done
