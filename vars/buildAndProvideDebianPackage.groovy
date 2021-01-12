@@ -1,4 +1,4 @@
-def call(Boolean isArchIndependent = false) {
+def call(Boolean isArchIndependent = false, List ignoredArchs = []) {
   String stashFileList = '*.gz,*.bz2,*.xz,*.deb,*.ddeb,*.udeb,*.dsc,*.changes,*.buildinfo,lintian.txt'
   String archiveFileList = '*.gz,*.bz2,*.xz,*.deb,*.ddeb,*.udeb,*.dsc,*.changes,*.buildinfo'
   long telegramChatId = -1001480273427
@@ -30,7 +30,7 @@ def call(Boolean isArchIndependent = false) {
         parallel {
           stage('Build binary - armhf') {
             agent { label 'arm64' }
-            when { expression { return !isArchIndependent } }
+            when { expression { return !isArchIndependent && !ignoredArchs.contains('armhf') } }
             steps {
               deleteDir()
               unstash 'source'
@@ -45,7 +45,7 @@ def call(Boolean isArchIndependent = false) {
           }
           stage('Build binary - arm64') {
             agent { label 'arm64' }
-            when { expression { return !isArchIndependent } }
+            when { expression { return !isArchIndependent && !ignoredArchs.contains('arm64') } }
             steps {
               deleteDir()
               unstash 'source'
