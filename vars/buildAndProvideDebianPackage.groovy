@@ -83,8 +83,12 @@ def call(Boolean isArchIndependent = false, List ignoredArchs = []) {
           // If statement can only be evaluated under a script stage.
           script {
             if (!isArchIndependent) {
-              unstash 'build-arm64'
-              unstash 'build-armhf'
+              if (!ignoredArchs.contains('arm64')) {
+                unstash 'build-arm64'
+              }
+              if (!ignoredArchs.contains('armhf')) {
+                unstash 'build-armhf'
+              }
             }
           }
           archiveArtifacts(artifacts: archiveFileList, fingerprint: true, onlyIfSuccessful: true)
