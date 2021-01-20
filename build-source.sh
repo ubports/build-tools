@@ -214,27 +214,27 @@ else
 
     # Make sure non-PR unreleased looks like PR unreleased. See below.
     (cd source && debchange --newversion "${changelog_version}~prerelease" --force-bad-version -- "")
+  elif [ -n "$CHANGE_TARGET" ] && (cd source && git diff --stat "${CHANGE_TARGET}..HEAD" | grep -q '^ debian/changelog '); then
+    # A PR is, by definition, prerelease. Set the version as such so that when the released version comes
+    # out (which is when this PR gets merged), this version won't trump the release. generate-git-snapshot
+    # will append the timestamp and git commit.
+    (cd source && debchange --newversion "${changelog_version}~prerelease" --force-bad-version -- "")
   elif (cd source && git show --stat --pretty=format: HEAD|grep -q '^ debian/changelog '); then
     # The last commit touch the changelog; assumes the it's the releasing commit
     if $is_releasing_repo; then
       # Special treatment for releasing repo; You release a version, and your version is being released!
-      # TODO: Should a non-releasing extension repos (e.g. xenial_-_gst-droid) receives this treatment too?
       export SKIP_DCH=true
     else
-      # A PR is, by definition, prerelease. Set the version as such so that when the released version comes
-      # out, this version won't trump the release. generate-git-snapshot will append the timestamp and git commit.
+      # When working in branch like xenial_-_qt-5-12, we don't know if this will get PR'ed into the releasing
+      # branch or not. To ensure version uniqueness, we also have to treat this also as a prerelease too.
+      # FIXME: This can have a weird quirk that a package can skips from a prerelease to a snapshot.
+      # This hopefully should be rare.
       (cd source && debchange --newversion "${changelog_version}~prerelease" --force-bad-version -- "")
     fi
   else
-    if [ -n "$CHANGE_TARGET" ]; then
-      if (cd source && git diff --stat "${CHANGE_TARGET}..HEAD" | grep -q '^ debian/changelog '); then
-        echo "ERROR: this PR does not release with the last commit."
-        exit 1
-      fi
-    fi
-
     # This repo does not increase the changelog version. Use generate-git-snapshot's normal snapshot versioning.
     # This is done by leaving the Debian changelog alone.
+    : This branch intentionally left blank.
   fi
 
   export TIMESTAMP_FORMAT="$d%Y%m%d%H%M%S"
