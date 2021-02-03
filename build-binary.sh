@@ -70,6 +70,7 @@ if [ -f multidist.buildinfo ]; then
 		echo "Bulding for $d"
 		export distribution=$d
 		export REPOSITORY_EXTRA="deb http://repo.ubports.com/ $d main"
+		export REPOSITORY_EXTRA_KEYS="https://repo.ubports.com/keyring.gpg"
 		export WORKSPACE="$rootwp/mbuild/$d"
 		cd "$WORKSPACE"
 		rm -r adt *.gpg || true
