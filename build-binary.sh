@@ -50,16 +50,6 @@ fi
 
 export DEB_BUILD_OPTIONS DEB_BUILD_PROFILES
 
-if [ -f ubports.depends.buildinfo ]; then
-	mv ubports.depends.buildinfo ubports.depends
-fi
-generate_repo_extra.py
-if [ -f ubports.repos_extra ]; then
-  export REPOSITORY_EXTRA="$(cat ubports.repos_extra)"
-  export REPOSITORY_EXTRA_KEYS="https://repo.ubports.com/keyring.gpg"
-  echo "INFO: Adding extra repo $REPOSITORY_EXTRA"
-fi
-
 if [ -f ubports.architecture.buildinfo ]; then
   THIS_ARCH=$(dpkg --print-architecture)
 	REQUEST_ARCH=$(cat ubports.architecture.buildinfo)
@@ -94,6 +84,16 @@ if [ -f multidist.buildinfo ]; then
 
 	tar -zcvf multidist-$architecture-$RANDOM.tar.gz mbuild
 else
+	if [ -f ubports.depends.buildinfo ]; then
+		mv ubports.depends.buildinfo ubports.depends
+	fi
+	generate_repo_extra.py
+	if [ -f ubports.repos_extra ]; then
+		export REPOSITORY_EXTRA="$(cat ubports.repos_extra)"
+		export REPOSITORY_EXTRA_KEYS="https://repo.ubports.com/keyring.gpg"
+		echo "INFO: Adding extra repo $REPOSITORY_EXTRA"
+	fi
+
 	export distribution=$(cat distribution.buildinfo)
 	/usr/bin/build-and-provide-package
 
