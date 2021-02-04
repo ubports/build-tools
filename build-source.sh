@@ -117,7 +117,7 @@ if [ "$GIT_BRANCH" = "master" ]; then
     export DIST="$d"
     # FIXME: remove this when we stop using our custom version of `generate-git-snapshot`
     export DIST_OVERRIDE="$DIST"
-    /usr/bin/generate-git-snapshot
+    generate-git-snapshot
     mkdir -p "mbuild/$d"
     mv *+0~$d* "mbuild/$d"
     unset TIMESTAMP_FORMAT
@@ -231,7 +231,7 @@ else
   fi
 
   export TIMESTAMP_FORMAT="$d%Y%m%d%H%M%S"
-  /usr/bin/generate-git-snapshot
+  generate-git-snapshot
   echo "Gen git snapshot done"
 
   echo "$REPOS" >buildinfos/ubports.target_apt_repository.buildinfo
