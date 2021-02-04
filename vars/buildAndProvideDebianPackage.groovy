@@ -10,6 +10,21 @@ def call(Boolean isArchIndependent = false, List ignoredArchs = []) {
       skipDefaultCheckout()
     }
     stages {
+      stage('Cherry-pick the MR to its shadow branch if requested') {
+        agent { label 'amd64' }
+        when { changeRequest comparator: 'REGEXP' target: 'main|master' }
+        // TODO: add credential environment for pushing
+        steps {
+          deleteDir()
+          checkout scm
+          sh 'cherrypicker.py' // FIXME: path
+        }
+        post {
+          cleanup {
+            deleteDir() /* clean up our workspace */
+          }
+        }
+      }
       stage('Build source') {
         agent { label 'amd64' }
         steps {
