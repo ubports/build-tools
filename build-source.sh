@@ -207,11 +207,16 @@ else
   if [ "$changelog_dist" = "UNRELEASED" ]; then
     # generate-git-snapsnot does the right thing for unreleased version. We just want some commit info.
     export UNRELEASED_APPEND_COMMIT=true
-  elif [ -n "$CHANGE_TARGET" ] && (cd source && git diff --stat "${CHANGE_TARGET}..HEAD" | grep -q '^ debian/changelog '); then
-    # A PR is, by definition, prerelease. Tell generate-git-snapshot not to increase version so that when
-    # the released version comes out (which is when this PR gets merged), this version won't trump the release.
-    # generate-git-snapshot will append the timestamp and git commit.
-    export DONT_INCREASE_VERSION=true
+  elif [ -n "$CHANGE_TARGET" ]; then
+    cd source/
+    git fetch origin "${CHANGE_TARGET}"
+    if git diff --stat "origin/${CHANGE_TARGET}..HEAD" | grep -q '^ debian/changelog '; then
+      # A PR is, by definition, prerelease. Tell generate-git-snapshot not to increase version so that when
+      # the released version comes out (which is when this PR gets merged), this version won't trump the release.
+      # generate-git-snapshot will append the timestamp and git commit.
+      export DONT_INCREASE_VERSION=true
+    fi
+    cd ../
   elif (cd source && git show --stat --pretty=format: HEAD|grep -q '^ debian/changelog '); then
     # The last commit touch the changelog; assumes the it's the releasing commit
     if $is_releasing_repo; then
