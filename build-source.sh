@@ -206,12 +206,6 @@ else
 
   # Versioning decision override for PR and releasing branch
   if [ "$changelog_dist" = "UNRELEASED" ]; then
-    # If the repo we're publishing is the distro name by itself, we don't allow UNRELEASED change.
-    if $is_releasing_repo; then
-      echo "ERROR: trying to publish UNRELEASD version to a releasing repo \"${REPOS}\"."
-      exit 1
-    fi
-
     # Make sure non-PR unreleased looks like PR unreleased. See below.
     (cd source && debchange --newversion "${changelog_version}~prerelease" --force-bad-version -- "")
   elif [ -n "$CHANGE_TARGET" ] && (cd source && git diff --stat "${CHANGE_TARGET}..HEAD" | grep -q '^ debian/changelog '); then
