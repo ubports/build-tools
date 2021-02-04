@@ -178,7 +178,6 @@ else
     branch_dist=${REPOS%%_-_*}
   fi
   changelog_dist=$(dpkg-parsechangelog -l source/debian/changelog --show-field Distribution)
-  changelog_version=$(dpkg-parsechangelog -l source/debian/changelog --show-field Version)
 
   if ! echo "$VALID_DISTS" | grep -q -w "$branch_dist"; then
     echo "Branch name (or merge target) does not contain valid distribution. Using distribution from changelog." \
@@ -206,13 +205,13 @@ else
 
   # Versioning decision override for PR and releasing branch
   if [ "$changelog_dist" = "UNRELEASED" ]; then
-    # Make sure non-PR unreleased looks like PR unreleased. See below.
-    (cd source && debchange --newversion "${changelog_version}~prerelease" --force-bad-version -- "")
+    # generate-git-snapsnot does the right thing for unreleased version. We just want some commit info.
+    export UNRELEASED_APPEND_COMMIT=true
   elif [ -n "$CHANGE_TARGET" ] && (cd source && git diff --stat "${CHANGE_TARGET}..HEAD" | grep -q '^ debian/changelog '); then
-    # A PR is, by definition, prerelease. Set the version as such so that when the released version comes
-    # out (which is when this PR gets merged), this version won't trump the release. generate-git-snapshot
-    # will append the timestamp and git commit.
-    (cd source && debchange --newversion "${changelog_version}~prerelease" --force-bad-version -- "")
+    # A PR is, by definition, prerelease. Tell generate-git-snapshot not to increase version so that when
+    # the released version comes out (which is when this PR gets merged), this version won't trump the release.
+    # generate-git-snapshot will append the timestamp and git commit.
+    export DONT_INCREASE_VERSION=true
   elif (cd source && git show --stat --pretty=format: HEAD|grep -q '^ debian/changelog '); then
     # The last commit touch the changelog; assumes the it's the releasing commit
     if $is_releasing_repo; then
@@ -220,10 +219,10 @@ else
       export SKIP_DCH=true
     else
       # When working in branch like xenial_-_qt-5-12, we don't know if this will get PR'ed into the releasing
-      # branch or not. To ensure version uniqueness, we also have to treat this also as a prerelease too.
+      # branch or not. To ensure version uniqueness, we also have to treat this also as a PR too.
       # FIXME: This can have a weird quirk that a package can skips from a prerelease to a snapshot.
       # This hopefully should be rare.
-      (cd source && debchange --newversion "${changelog_version}~prerelease" --force-bad-version -- "")
+      export DONT_INCREASE_VERSION=true
     fi
   else
     # This repo does not increase the changelog version. Use generate-git-snapshot's normal snapshot versioning.
@@ -232,7 +231,6 @@ else
   fi
 
   export TIMESTAMP_FORMAT="$d%Y%m%d%H%M%S"
-  export UNRELEASED_APPEND_COMMIT=true
   /usr/bin/generate-git-snapshot
   echo "Gen git snapshot done"
 
