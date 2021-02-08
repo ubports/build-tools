@@ -69,10 +69,11 @@ if [ -n "$source_location_file" ]; then
   done <"$source_location_file"
 
   export IGNORE_GIT_BUILDPACKAGE=true
-  export USE_ORIG_VERSION=true
-  export SKIP_DCH=true
+  # FIXME: This relies on UBports-specific change to generate-git-snapshot.
+  # Maybe using PRE_SOURCE_HOOK, but it accepts shell script file path and
+  # that means we have to locate the path of ourself.
   export SKIP_PRE_CLEANUP=true
-  export SKIP_GIT_CLEANUP=true
+
   # Always include the original source in the .changes file.
   # Ideally we should do this only when we have a new upstream version, but
   # I'm too lazy to check if a source package is already in the repo.
@@ -107,14 +108,9 @@ for file in \
   fi
 done
 
-if echo $VALID_DISTS | grep -w $GIT_BRANCH > /dev/null; then
-        echo "This is on a release branch, overriding dist to $GIT_BRANCH"
-        export DIST_OVERRIDE=$GIT_BRANCH
-fi
-if echo "xenial-dev" | grep -w $GIT_BRANCH > /dev/null; then
-        echo "This is on a release branch, overriding dist to xenial"
-        export DIST_OVERRIDE="xenial"
-fi
+# Skip git cleanup, or those files will come back and/or our modification
+# to debian/changelog will be overwritten (see below).
+export SKIP_GIT_CLEANUP=true
 
 # Multi dist build for "master" only
 # We might want to expand this to allow PR's to build like this
@@ -123,11 +119,15 @@ if [ "$GIT_BRANCH" = "master" ]; then
   for d in $BUILD_DISTS_MULTI ; do
     echo "Gen git snapshot for $d"
     export TIMESTAMP_FORMAT="$d%Y%m%d%H%M%S"
-    export DIST_OVERRIDE="$d"
-    /usr/bin/generate-git-snapshot
+    export DIST="$d"
+    # FIXME: remove this when we stop using our custom version of `generate-git-snapshot`
+    export DIST_OVERRIDE="$DIST"
+    generate-git-snapshot
     mkdir -p "mbuild/$d"
     mv *+0~$d* "mbuild/$d"
     unset TIMESTAMP_FORMAT
+    unset DIST
+    # FIXME: remove this when we stop using our custom version of `generate-git-snapshot`
     unset DIST_OVERRIDE
   done
   tar -zcvf multidist.tar.gz mbuild
@@ -162,7 +162,8 @@ else
 
     if [ -n "${CHANGE_TARGET}" ]; then
       # Remove "ubports/" prefix if present
-      echo "${CHANGE_TARGET#ubports/}" >> buildinfos/ubports.depends.buildinfo
+      CHANGE_TARGET_REPO="${CHANGE_TARGET#ubports/}"
+      echo "$CHANGE_TARGET_REPO" >> buildinfos/ubports.depends.buildinfo
     fi
   else
     # Support both ubports/xenial(_-_.*)? and xenial(_-_.*)?
@@ -175,8 +176,72 @@ else
     fi
   fi
 
+  # Decides which distribution the snapshot is released to (affects base rootfs selection for building).
+  if [ -n "$CHANGE_ID" ]; then
+    branch_dist=${CHANGE_TARGET_REPO%%_-_*}
+  else
+    branch_dist=${REPOS%%_-_*}
+  fi
+  changelog_dist=$(dpkg-parsechangelog -l source/debian/changelog --show-field Distribution)
+
+  if ! echo "$VALID_DISTS" | grep -q -w "$branch_dist"; then
+    echo "Branch name (or merge target) does not contain valid distribution. Using distribution from changelog." \
+         "Note that repo dependencies might not work correctly."
+    DIST="$changelog_dist"
+  else
+    echo "Using distribution from branch name (or merge target)."
+    DIST="$branch_dist"
+
+    if [ "$changelog_dist" != "UNRELEASED" ] && [ "$changelog_dist" != "$branch_dist" ]; then
+      echo "Note: distribution in changelog (${changelog_dist}) does not match branch's distribution (${branch_dist})."
+    fi
+  fi
+
+  if ! echo "$VALID_DISTS" | grep -q -w "$DIST"; then
+    echo "ERROR: Distribution '${DIST}' is not a valid distribution for this CI."
+    exit 1
+  fi
+
+  export DIST
+  # FIXME: remove this when we stop using our custom version of `generate-git-snapshot`
+  export DIST_OVERRIDE="$DIST"
+
+  is_releasing_repo=$(echo "$VALID_DISTS" | grep -q -w "$REPOS" && echo true || echo false)
+
+  # Versioning decision override for PR and releasing branch
+  if [ "$changelog_dist" = "UNRELEASED" ]; then
+    # generate-git-snapsnot does the right thing for unreleased version. We just want some commit info.
+    export UNRELEASED_APPEND_COMMIT=true
+  elif [ -n "$CHANGE_TARGET" ]; then
+    cd source/
+    git fetch origin "${CHANGE_TARGET}"
+    if git diff --stat "origin/${CHANGE_TARGET}..HEAD" | grep -q '^ debian/changelog '; then
+      # A PR is, by definition, prerelease. Tell generate-git-snapshot not to increase version so that when
+      # the released version comes out (which is when this PR gets merged), this version won't trump the release.
+      # generate-git-snapshot will append the timestamp and git commit.
+      export DONT_INCREASE_VERSION=true
+    fi
+    cd ../
+  elif (cd source && git show --stat --pretty=format: HEAD|grep -q '^ debian/changelog '); then
+    # The last commit touch the changelog; assumes the it's the releasing commit
+    if $is_releasing_repo; then
+      # Special treatment for releasing repo; You release a version, and your version is being released!
+      export SKIP_DCH=true
+    else
+      # When working in branch like xenial_-_qt-5-12, we don't know if this will get PR'ed into the releasing
+      # branch or not. To ensure version uniqueness, we also have to treat this also as a PR too.
+      # FIXME: This can have a weird quirk that a package can skips from a prerelease to a snapshot.
+      # This hopefully should be rare.
+      export DONT_INCREASE_VERSION=true
+    fi
+  else
+    # This repo does not increase the changelog version. Use generate-git-snapshot's normal snapshot versioning.
+    # This is done by leaving the Debian changelog alone.
+    : This branch intentionally left blank.
+  fi
+
   export TIMESTAMP_FORMAT="$d%Y%m%d%H%M%S"
-  /usr/bin/generate-git-snapshot
+  generate-git-snapshot
   echo "Gen git snapshot done"
 
   echo "$REPOS" >buildinfos/ubports.target_apt_repository.buildinfo
@@ -188,6 +253,11 @@ else
       exit 1
     fi
   fi
+
+  # Convey the distribution of choice (used by build-binary.sh).
+  # It was in our custom generate-git-snapshot, but now we bring it out so that
+  # we don't have to rely on hidden modification.
+  echo "$DIST" > distribution.buildinfo
 fi
 
 # Move buildinfos back to the workspace root, so that they'll be stashed.
