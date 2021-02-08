@@ -128,6 +128,14 @@ export SKIP_GIT_CLEANUP=true
 if contains "$MULTIDIST_BRANCHES" "$GIT_BRANCH"; then
   echo "Doing multi build!"
   while read -r d dist_suffix ; do
+    # Check if the distro-specific branch exists.
+    if (cd source && git fetch origin "ubports/$d"); then
+      echo "Branch ubports/$d exists, skip multidist build for $d"
+      continue
+    else
+      built_distro="${built_distro} ${d}"
+    fi
+
     echo "Gen git snapshot for $d"
     export DIST="$d"
     # FIXME: remove this when we stop using our custom version of `generate-git-snapshot`
@@ -142,7 +150,14 @@ if contains "$MULTIDIST_BRANCHES" "$GIT_BRANCH"; then
     unset DIST_OVERRIDE
   done <<< "$BUILD_DISTS_MULTI"
   tar -zcvf multidist.tar.gz mbuild
-  echo "$BUILD_DISTS_MULTI"|cut -d' ' -f1 > multidist.buildinfo
+
+  if [ -z "$built_distro" ]; then
+    echo "No distro is included in multidist. Maybe \"$GIT_BRANCH\" shouldn't exist?"
+    exit 1
+  fi
+
+  # "# " removes leading space from $built_distro.
+  echo "${built_distro# }" > multidist.buildinfo
 else
   if [ -n "$CHANGE_ID" ]; then
     # This is a PR. Publish each PR for each project into its own repository
