@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Copyright (C) 2017 Marius Gripsgard <marius@ubports.com>
 #
@@ -31,7 +31,14 @@ sourcedebian_or_source () {
   first_existing_file "source/debian/${1}" "source/${1}"
 }
 
+# https://stackoverflow.com/a/8063398
+# Usage: contains aList anItem
+contains() {
+    [[ $1 =~ (^|[[:space:]])$2($|[[:space:]]) ]] && return 0 || return 1
+}
+
 # Multi distro, set here to build master for multripple distros!
+MULTIDIST_BRANCHES="main master"
 BUILD_DISTS_MULTI="xenial focal"
 
 VALID_DISTS_UBUNTU="xenial bionic focal groovy"
@@ -114,7 +121,7 @@ export SKIP_GIT_CLEANUP=true
 
 # Multi dist build for "master" only
 # We might want to expand this to allow PR's to build like this
-if [ "$GIT_BRANCH" = "master" ]; then
+if contains "$MULTIDIST_BRANCHES" "$GIT_BRANCH"; then
   echo "Doing multi build!"
   for d in $BUILD_DISTS_MULTI ; do
     echo "Gen git snapshot for $d"
