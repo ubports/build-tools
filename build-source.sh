@@ -69,6 +69,11 @@ if [ -n "$source_location_file" ]; then
   done <"$source_location_file"
 
   export IGNORE_GIT_BUILDPACKAGE=true
+  # FIXME: This relies on UBports-specific change to generate-git-snapshot.
+  # Maybe using PRE_SOURCE_HOOK, but it accepts shell script file path and
+  # that means we have to locate the path of ourself.
+  export SKIP_PRE_CLEANUP=true
+
   # Always include the original source in the .changes file.
   # Ideally we should do this only when we have a new upstream version, but
   # I'm too lazy to check if a source package is already in the repo.
