@@ -39,7 +39,11 @@ contains() {
 
 # Multi distro, set here to build master for multripple distros!
 MULTIDIST_BRANCHES="main master"
-BUILD_DISTS_MULTI="xenial focal"
+# Contains the distribution name and versioning suffix
+BUILD_DISTS_MULTI="\
+xenial ubports16.04
+focal ubports20.04
+"
 
 VALID_DISTS_UBUNTU="xenial bionic focal groovy"
 VALID_DISTS_DEBIAN="buster bullseye sid"
@@ -123,22 +127,22 @@ export SKIP_GIT_CLEANUP=true
 # We might want to expand this to allow PR's to build like this
 if contains "$MULTIDIST_BRANCHES" "$GIT_BRANCH"; then
   echo "Doing multi build!"
-  for d in $BUILD_DISTS_MULTI ; do
+  while read -r d dist_suffix ; do
     echo "Gen git snapshot for $d"
-    export TIMESTAMP_FORMAT="$d%Y%m%d%H%M%S"
     export DIST="$d"
     # FIXME: remove this when we stop using our custom version of `generate-git-snapshot`
     export DIST_OVERRIDE="$DIST"
+    # This will be appended to the version number, after a '+'.
+    export distribution=$dist_suffix
     generate-git-snapshot
     mkdir -p "mbuild/$d"
-    mv *+0~$d* "mbuild/$d"
-    unset TIMESTAMP_FORMAT
+    mv "./*+${dist_suffix}*" "mbuild/$d"
     unset DIST
     # FIXME: remove this when we stop using our custom version of `generate-git-snapshot`
     unset DIST_OVERRIDE
-  done
+  done <<< "$BUILD_DISTS_MULTI"
   tar -zcvf multidist.tar.gz mbuild
-  echo "$BUILD_DISTS_MULTI" > multidist.buildinfo
+  echo "$BUILD_DISTS_MULTI"|cut -d' ' -f1 > multidist.buildinfo
 else
   if [ -n "$CHANGE_ID" ]; then
     # This is a PR. Publish each PR for each project into its own repository
