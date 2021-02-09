@@ -69,11 +69,18 @@ if [ -f multidist.buildinfo ]; then
 	for d in $MULTI_DIST ; do
 		echo "Bulding for $d"
 		export distribution=$d
-		export REPOSITORY_EXTRA="deb http://repo.ubports.com/ $d main"
-		export REPOSITORY_EXTRA_KEYS="https://repo.ubports.com/keyring.gpg"
 		export WORKSPACE="$rootwp/mbuild/$d"
 		cd "$WORKSPACE"
 		rm -r adt *.gpg || true
+
+		# generate_repo_extra.py has to run inside the workspace dir
+		generate_repo_extra.py
+		if [ -f ubports.repos_extra ]; then
+			export REPOSITORY_EXTRA="$(cat ubports.repos_extra)"
+			export REPOSITORY_EXTRA_KEYS="https://repo.ubports.com/keyring.gpg"
+			echo "INFO: Adding extra repo $REPOSITORY_EXTRA"
+		fi
+
 		/usr/bin/build-and-provide-package
 		cd $rootwp
 	done

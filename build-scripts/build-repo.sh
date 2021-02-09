@@ -37,11 +37,14 @@ if [ -f multidist.buildinfo ]; then
 
 	for d in $MULTI_DIST ; do
 		echo "Repo-ing for $d"
-		export distribution="$d"
-    export release="$d"
-    export REPOS="$release"
     export WORKSPACE="$rootwp/mbuild/$d"
     cd "$WORKSPACE"
+
+    release="$(cat ubports.target_apt_repository.buildinfo)"
+    distribution=$d
+    REPOS="$release"
+    export release distribution REPOS
+
     mkdir $BASE_PATH || true
     for suffix in gz bz2 xz deb dsc changes ddeb udeb buildinfo ; do
       mv *.${suffix} $BASE_PATH || true
