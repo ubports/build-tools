@@ -81,6 +81,9 @@ if [ -f multidist.buildinfo ]; then
 			echo "INFO: Adding extra repo $REPOSITORY_EXTRA"
 		fi
 
+		# Ensure orig tarball exists
+		find "$rootwp" -name '*.orig.*' -exec ln -s '{}' ./ \+
+
 		/usr/bin/build-and-provide-package
 		cd $rootwp
 	done
