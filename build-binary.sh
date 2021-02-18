@@ -69,7 +69,17 @@ if [ -f multidist.buildinfo ]; then
 	for d in $MULTI_DIST ; do
 		echo "Bulding for $d"
 		export distribution=$d
-		export REPOSITORY_EXTRA="deb http://repo.ubports.com/ $d main"
+
+		case "$d" in
+			xenial|bionic)
+				REPOSITORY_EXTRA="deb http://repo.ubports.com/ $d main"
+				;;
+			*)
+				REPOSITORY_EXTRA="deb http://repo2.ubports.com/ $d main"
+				;;
+		esac
+		export REPOSITORY_EXTRA
+
 		export REPOSITORY_EXTRA_KEYS="https://repo.ubports.com/keyring.gpg"
 		export WORKSPACE="$rootwp/mbuild/$d"
 		cd "$WORKSPACE"
