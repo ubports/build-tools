@@ -37,6 +37,15 @@ contains() {
     [[ $1 =~ (^|[[:space:]])$2($|[[:space:]]) ]] && return 0 || return 1
 }
 
+pr_repo_naming() {
+  local GIT_URL GIT_REPO_NAME
+
+  GIT_URL=$(cd source && git remote get-url origin)
+  GIT_REPO_NAME="$(basename "${GIT_URL%.git}")"
+
+  echo "PR_${GIT_REPO_NAME}_${CHANGE_ID}"
+}
+
 # Multi distro, set here to build master for multripple distros!
 MULTIDIST_BRANCHES="main master"
 # Contains the distribution name and versioning suffix
@@ -124,8 +133,8 @@ done
 export SKIP_GIT_CLEANUP=true
 
 # Multi dist build for "master" only
-# We might want to expand this to allow PR's to build like this
-if contains "$MULTIDIST_BRANCHES" "$GIT_BRANCH"; then
+if contains "$MULTIDIST_BRANCHES" "$GIT_BRANCH" || \
+    ([ -n "$CHANGE_TARGET" ] && contains "$MULTIDIST_BRANCHES" "$CHANGE_TARGET"); then
   echo "Doing multi build!"
   # Pre-fetch git branches from the remote, so that we can check if the
   # branches exist without hitting rate limit (see below).
@@ -154,6 +163,14 @@ if contains "$MULTIDIST_BRANCHES" "$GIT_BRANCH"; then
     unset DIST
     # FIXME: remove this when we stop using our custom version of `generate-git-snapshot`
     unset DIST_OVERRIDE
+
+    # Specify which repo we want the package to land, as we now support MRs.
+    if [ -n "$CHANGE_TARGET" ]; then
+      target_repo="${d}_-_$(pr_repo_naming)"
+    else
+      target_repo="$d"
+    fi
+    echo "$target_repo" >"mbuild/$d/ubports.target_apt_repository.buildinfo"
   done < <(printf '%s' "$BUILD_DISTS_MULTI")
   tar -zcvf multidist.tar.gz mbuild
 
@@ -167,26 +184,7 @@ if contains "$MULTIDIST_BRANCHES" "$GIT_BRANCH"; then
 else
   if [ -n "$CHANGE_ID" ]; then
     # This is a PR. Publish each PR for each project into its own repository
-
-    if [ -n "$GIT_URL" ]; then
-      echo "DEBUG: \$GIT_URL is ${GIT_URL}"
-    elif [ -n "$GIT_URL_1" ]; then
-      echo "DEBUG: Set \$GIT_URL to \$GIT_URL_1, which is ${GIT_URL_1}"
-      GIT_URL=$GIT_URL_1
-    else
-      GIT_URL=$( (cd source && git remote get-url origin) || true)
-      echo "DEBUG: Set \$GIT_URL to git repo's origin remote url, which is ${GIT_URL}"
-    fi
-
-    if [ -n "$GIT_URL" ]; then
-      GIT_REPO_NAME="$(basename "${GIT_URL%.git}")"
-    else
-      echo "Cannot determine git repo name. Try to use the job name instead." \
-          "May produce incorrect apt repository name."
-      GIT_REPO_NAME=$JOB_BASE_NAME
-    fi
-
-    REPOS="PR_${GIT_REPO_NAME}_${CHANGE_ID}"
+    REPOS="$(pr_repo_naming)"
 
     # We want the target branch to be part of our repo dependency (in addition to
     # what's specified in ubports.depends)
