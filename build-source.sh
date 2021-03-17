@@ -157,6 +157,27 @@ if contains "$MULTIDIST_BRANCHES" "$GIT_BRANCH" || \
     export DIST_OVERRIDE="$DIST"
     # This will be appended to the version number, after a '+'.
     export distribution=$dist_suffix
+
+    # Versioning decision override for PR
+    # TODO: might want to refactor this and the version below.
+    changelog_dist=$(dpkg-parsechangelog -l source/debian/changelog --show-field Distribution)
+    changelog_version=$(dpkg-parsechangelog -l source/debian/changelog --show-field Version)
+
+    if [ "$changelog_dist" = "UNRELEASED" ]; then
+      # generate-git-snapsnot does the right thing for unreleased version.
+      : This branch intentionally left blank.
+    elif [ -n "$CHANGE_TARGET" ]; then
+      cd source/
+      if git diff --stat "origin/${CHANGE_TARGET}..HEAD" | grep -q '^ debian/changelog '; then
+        # A PR is, by definition, prerelease. Add a new changelog entry with UNRELEASED distro so that when
+        # the released version comes out (which is when this PR gets merged), this version won't trump the release.
+        # generate-git-snapshot will append the timestamp and git commit.
+        dch --newversion="$changelog_version" --force-bad-version --distribution=UNRELEASED -- ""
+      fi
+      cd ../
+    fi
+
+    export UNRELEASED_APPEND_COMMIT=true
     generate-git-snapshot
     mkdir -p "mbuild/$d"
     mv ./*+"${dist_suffix}"* "mbuild/$d"
