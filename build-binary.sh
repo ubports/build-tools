@@ -82,7 +82,9 @@ if [ -f multidist.buildinfo ]; then
 		fi
 
 		# Ensure orig tarball exists
-		find "$rootwp" -name '*.orig.*' -exec ln -s '{}' ./ \+
+		find "$rootwp" \
+			-maxdepth 1 -type f -name '*.orig.*' \
+			-exec ln -s '{}' ./ ';'
 
 		/usr/bin/build-and-provide-package
 		cd $rootwp
