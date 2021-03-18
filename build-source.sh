@@ -138,13 +138,12 @@ if contains "$MULTIDIST_BRANCHES" "$GIT_BRANCH" || \
   echo "Doing multi build!"
   # Pre-fetch git branches from the remote, so that we can check if the
   # branches exist without hitting rate limit (see below).
-  (cd source && git fetch origin) || true
+  # Output of git ls-remote looks like this:
+  # c689be1d07b1aca7d880f43115b143e3299f0793        refs/heads/master
+  remote_branches=$( { cd source && git ls-remote --heads origin ; } || true)
   while read -r d dist_suffix ; do
     # Check if the distro-specific branch exists.
-    if (cd source && { \
-        git show-branch "remotes/origin/ubports/$d" || \
-        git show-branch "remotes/origin/$d" ;
-    }); then
+    if echo "$remote_branches" | grep -E -q "refs/heads(/ubports)?/${d}\$"; then
       echo "Branch ubports/$d exists, skip multidist build for $d"
       continue
     else
