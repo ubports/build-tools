@@ -57,12 +57,14 @@ if [ -f multidist.buildinfo ]; then
     aptly -db-open-attempts=400 repo include -no-remove-files -repo="$release" $BASE_PATH
     aptly -db-open-attempts=400 publish update $release filesystem:repo:main
 
-    # Freight hates non-standard files
-    rm $BASE_PATH/*.ddeb $BASE_PATH/*.udeb || true
-		/usr/bin/build-and-provide-package
-    for suffix in gz bz2 xz deb dsc change ; do
-      mv $BASE_PATH*.${suffix} $rootwp || true
-    done
+    if ! echo $APTLY_ONLY | grep -qw $release; then
+      # Also publish to Freight repo. Freight is unable to handle .{d,u}deb files,
+      # so they have to be removed.
+      rm $BASE_PATH/*.ddeb $BASE_PATH/*.udeb || true
+
+      /usr/bin/build-and-provide-package
+    fi
+
     cd $rootwp
 	done
 else
