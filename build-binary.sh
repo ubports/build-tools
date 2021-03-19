@@ -66,6 +66,11 @@ if [ -f multidist.buildinfo ]; then
 	rm multidist.tar.gz
 	export rootwp=$(pwd)
 
+	# Move orig to mbuild folder
+	find "$rootwp" \
+        -maxdepth 1 -type f -name '*.orig.*' \
+        -exec mv '{}' "$rootwp/mbuild" ';'
+
 	for d in $MULTI_DIST ; do
 		echo "Bulding for $d"
 		export distribution=$d
@@ -82,7 +87,7 @@ if [ -f multidist.buildinfo ]; then
 		fi
 
 		# Ensure orig tarball exists
-		find "$rootwp" \
+		find ../ \
 			-maxdepth 1 -type f -name '*.orig.*' \
 			-exec ln -s '{}' ./ ';'
 
