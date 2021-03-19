@@ -45,22 +45,24 @@ if [ -f multidist.buildinfo ]; then
     REPOS="$release"
     export release distribution REPOS
 
-    mkdir $BASE_PATH || true
-    for suffix in gz bz2 xz deb dsc changes ddeb udeb buildinfo ; do
-      mv *.${suffix} $BASE_PATH || true
-    done
-
     if ! aptly -db-open-attempts=400 repo show $release ; then
       aptly -db-open-attempts=400 repo create -distribution="$release" $release
       aptly -db-open-attempts=400 publish repo $release filesystem:repo:main
     fi
-    aptly -db-open-attempts=400 repo include -no-remove-files -repo="$release" $BASE_PATH
+    aptly -db-open-attempts=400 repo include -no-remove-files -repo="$release" .
     aptly -db-open-attempts=400 publish update $release filesystem:repo:main
 
     if ! echo $APTLY_ONLY | grep -qw $release; then
-      # Also publish to Freight repo. Freight is unable to handle .{d,u}deb files,
-      # so they have to be removed.
-      rm $BASE_PATH/*.ddeb $BASE_PATH/*.udeb || true
+      # Freight is unable to handle .{d,u}deb files, so ignore those
+      # Also move to "./binaries" is only needed for freight as its both hardcoded
+      # and to make sure freight only pics up the right files, but not needed
+      # for aptly since we use .changes
+      mkdir $BASE_PATH || true
+      for suffix in gz bz2 xz deb dsc changes buildinfo ; do
+          mv *.${suffix} $BASE_PATH || true
+      done
+      # Make a copy of the orig since we moved the files making the symlink invalid
+      cp "../*.orig.*" $BASE_PATH || true
 
       /usr/bin/build-and-provide-package
     fi
@@ -73,10 +75,6 @@ else
   REPOS="$release"
   export release distribution REPOS
 
-  for suffix in gz bz2 xz deb dsc changes ddeb udeb buildinfo ; do
-    mv *.${suffix} $BASE_PATH || true
-  done
-
   # Publish built packages to Aptly repo.
   if ! aptly -db-open-attempts=400 repo show $release ; then
     aptly -db-open-attempts=400 repo create -distribution="$release" $release
@@ -85,13 +83,18 @@ else
 
   # -no-remove-files leaves the files on the disk, so that we can also publish
   # them to Freight repo.
-  aptly -db-open-attempts=400 repo include -no-remove-files -repo="$release" $BASE_PATH
+  aptly -db-open-attempts=400 repo include -no-remove-files -repo="$release" .
   aptly -db-open-attempts=400 publish update -force-overwrite $release filesystem:repo:main
 
+  # Todo remove once xenial is gone
   if ! echo $APTLY_ONLY | grep -qw $release; then
-    # Also publish to Freight repo. Freight is unable to handle .{d,u}deb files,
-    # so they have to be removed.
-    rm $BASE_PATH/*.ddeb $BASE_PATH/*.udeb || true
+    # Freight is unable to handle .{d,u}deb files, so ignore those
+    # Also move to "./binaries" is only needed for freight as its both hardcoded
+    # and to make sure freight only pics up the right files, but not needed
+    # for aptly since we use .changes
+    for suffix in gz bz2 xz deb dsc changes buildinfo ; do
+      mv *.${suffix} $BASE_PATH || true
+    done
 
     /usr/bin/build-and-provide-package
   fi
