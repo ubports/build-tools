@@ -27,16 +27,16 @@ export APTLY_ONLY="focal"
 # Aptly does not need sudo, as the jenkins user is in the aptly group
 
 if [ -f multidist.buildinfo ]; then
-	echo "Doing multibuild"
-	MULTI_DIST=$(cat multidist.buildinfo)
+  echo "Doing multibuild"
+  MULTI_DIST=$(cat multidist.buildinfo)
   for t in multidist*.tar.gz ; do
     tar --overwrite -xvzf $t
   done
-	rm multidist*.tar.gz || true
+  rm multidist*.tar.gz || true
   export rootwp=$(pwd)
 
-	for d in $MULTI_DIST ; do
-		echo "Repo-ing for $d"
+  for d in $MULTI_DIST ; do
+    echo "Repo-ing for $d"
     export WORKSPACE="$rootwp/mbuild/$d"
     cd "$WORKSPACE"
 
