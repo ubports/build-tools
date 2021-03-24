@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Copyright (C) 2017 Marius Gripsgard <marius@ubports.com>
 #
@@ -22,7 +22,6 @@ mkdir -p binaries
 export PROVIDE_ONLY=true
 export SUDO_CMD=sudo
 export BASE_PATH="binaries/"
-export APTLY_ONLY="focal"
 
 # Aptly does not need sudo, as the jenkins user is in the aptly group
 
@@ -52,7 +51,7 @@ if [ -f multidist.buildinfo ]; then
     aptly -db-open-attempts=400 repo include -no-remove-files -repo="$release" .
     aptly -db-open-attempts=400 publish update $release filesystem:repo:main
 
-    if ! echo $APTLY_ONLY | grep -qw $release; then
+    if [[ $release =~ ^xenial($|_-_) ]]; then
       # Freight is unable to handle .{d,u}deb files, so ignore those
       # Also move to "./binaries" is only needed for freight as its both hardcoded
       # and to make sure freight only pics up the right files, but not needed
@@ -87,7 +86,7 @@ else
   aptly -db-open-attempts=400 publish update -force-overwrite $release filesystem:repo:main
 
   # Todo remove once xenial is gone
-  if ! echo $APTLY_ONLY | grep -qw $release; then
+  if [[ $release =~ ^xenial($|_-_) ]]; then
     # Freight is unable to handle .{d,u}deb files, so ignore those
     # Also move to "./binaries" is only needed for freight as its both hardcoded
     # and to make sure freight only pics up the right files, but not needed
