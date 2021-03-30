@@ -47,7 +47,7 @@ pr_repo_naming() {
 }
 
 # Multi distro, set here to build master for multripple distros!
-MULTIDIST_BRANCHES="main master"
+MULTIDIST_BRANCHES="main master ubports/latest"
 # Contains the distribution name and versioning suffix
 BUILD_DISTS_MULTI="\
 xenial ubports16.04
