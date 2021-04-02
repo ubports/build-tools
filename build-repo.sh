@@ -46,7 +46,7 @@ if [ -f multidist.buildinfo ]; then
 
     if ! aptly -db-open-attempts=400 repo show $release ; then
       aptly -db-open-attempts=400 repo create -distribution="$release" $release
-      aptly -db-open-attempts=400 publish repo $release filesystem:repo:main
+      aptly -db-open-attempts=400 publish repo -origin='UBports' "$release" filesystem:repo:main
     fi
     aptly -db-open-attempts=400 repo include -no-remove-files -repo="$release" .
     aptly -db-open-attempts=400 publish update $release filesystem:repo:main
@@ -77,7 +77,7 @@ else
   # Publish built packages to Aptly repo.
   if ! aptly -db-open-attempts=400 repo show $release ; then
     aptly -db-open-attempts=400 repo create -distribution="$release" $release
-    aptly -db-open-attempts=400 publish repo $release filesystem:repo:main
+    aptly -db-open-attempts=400 publish repo -origin='UBports' "$release" filesystem:repo:main
   fi
 
   # -no-remove-files leaves the files on the disk, so that we can also publish
