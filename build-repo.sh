@@ -84,7 +84,7 @@ else
   # -no-remove-files leaves the files on the disk, so that we can also publish
   # them to Freight repo.
   aptly -db-open-attempts=400 repo include -no-remove-files -repo="$release" .
-  aptly -db-open-attempts=400 publish update -force-overwrite "$release" filesystem:repo:main
+  aptly -db-open-attempts=400 publish update "$release" filesystem:repo:main
 
   # Todo remove once xenial is gone
   if [[ $release =~ ^xenial($|_-_) ]]; then
