@@ -62,8 +62,8 @@ VALID_ARCHS="armhf arm64 amd64"
 
 if [ ! "$SKIP_MOVE" = "true" ]; then
         tmp=$(mktemp -d)
-        mv * .* $tmp/
-        mv $tmp ./source
+        mv ./* ./.* "$tmp/"
+        mv "$tmp" ./source
 fi
 
 ls source
@@ -74,8 +74,9 @@ cd source
 if [ -f .gitmodules ]; then
   git submodule update --init --recursive
 fi
-export GIT_COMMIT=$(git rev-parse HEAD)
-export GIT_BRANCH=$BRANCH_NAME
+GIT_COMMIT=$(git rev-parse HEAD)
+export GIT_COMMIT
+export GIT_BRANCH="$BRANCH_NAME"
 cd ..
 
 source_location_file=$(sourcedebian_or_source ubports.source_location)

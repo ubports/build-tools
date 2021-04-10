@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Copyright (C) 2017,2018 Marius Gripsgard <marius@ubports.com>
 #
@@ -64,7 +64,8 @@ if [ -f multidist.buildinfo ]; then
 	MULTI_DIST=$(cat multidist.buildinfo)
 	tar -xvzf multidist.tar.gz
 	rm multidist.tar.gz
-	export rootwp=$(pwd)
+	rootwp=$(pwd)
+	export rootwp
 
 	# Move orig to mbuild folder
 	find "$rootwp" \
@@ -76,13 +77,15 @@ if [ -f multidist.buildinfo ]; then
 		export distribution=$d
 		export WORKSPACE="$rootwp/mbuild/$d"
 		cd "$WORKSPACE"
-		rm -r adt *.gpg || true
+		rm -r adt ./*.gpg || true
 
 		# generate_repo_extra.py has to run inside the workspace dir
 		generate_repo_extra.py
 		if [ -f ubports.repos_extra ]; then
-			export REPOSITORY_EXTRA="$(cat ubports.repos_extra)"
-			export REPOSITORY_EXTRA_KEYS="https://repo.ubports.com/keyring.gpg"
+			REPOSITORY_EXTRA="$(cat ubports.repos_extra)"
+			export REPOSITORY_EXTRA
+			REPOSITORY_EXTRA_KEYS="https://repo.ubports.com/keyring.gpg"
+			export REPOSITORY_EXTRA_KEYS
 			echo "INFO: Adding extra repo $REPOSITORY_EXTRA"
 		fi
 
@@ -92,7 +95,7 @@ if [ -f multidist.buildinfo ]; then
 			-exec ln -s '{}' ./ ';'
 
 		/usr/bin/build-and-provide-package
-		cd $rootwp
+		cd "$rootwp"
 	done
 
 	. /etc/jenkins/debian_glue
@@ -100,21 +103,24 @@ if [ -f multidist.buildinfo ]; then
 		debsign -k"${KEY_ID:-}" "mbuild/$d/"*.changes
 	done
 
-	tar -zcvf multidist-$architecture-$RANDOM.tar.gz mbuild
+	tar -zcvf "multidist-$architecture-$RANDOM.tar.gz" mbuild
 else
 	if [ -f ubports.depends.buildinfo ]; then
 		mv ubports.depends.buildinfo ubports.depends
 	fi
 	generate_repo_extra.py
 	if [ -f ubports.repos_extra ]; then
-		export REPOSITORY_EXTRA="$(cat ubports.repos_extra)"
-		export REPOSITORY_EXTRA_KEYS="https://repo.ubports.com/keyring.gpg"
+		REPOSITORY_EXTRA="$(cat ubports.repos_extra)"
+		export REPOSITORY_EXTRA
+		REPOSITORY_EXTRA_KEYS="https://repo.ubports.com/keyring.gpg"
+		export REPOSITORY_EXTRA_KEYS
 		echo "INFO: Adding extra repo $REPOSITORY_EXTRA"
 	fi
 
-	export distribution=$(cat distribution.buildinfo)
+	distribution=$(cat distribution.buildinfo)
+	export distribution
 	/usr/bin/build-and-provide-package
 
 	. /etc/jenkins/debian_glue
-	debsign -k"${KEY_ID:-}" *.changes
+	debsign -k"${KEY_ID:-}" ./*.changes
 fi
