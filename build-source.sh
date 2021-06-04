@@ -191,6 +191,37 @@ if contains "$MULTIDIST_BRANCHES" "$GIT_BRANCH" || \
       target_repo="$d"
     fi
     echo "$target_repo" >"mbuild/$d/ubports.target_apt_repository.buildinfo"
+
+    # For MRs, support specifying build dependency MRs. This should ideally be
+    # read from GitLab's MR dependencies, but for now there's no API for it
+    # (yet) [1]. For now, we read ubports.depends.
+    #
+    # The format is a little different though. We support specifying MRs in form
+    # of PR_<repo>_<MR num>  only. We'll prepend 'xenial' or 'focal' for the
+    # current multidist target and put it in proper ubports.depends for
+    # generate_repo_extra.py to consume.
+    #
+    # Another catch is that the dependent MR has to also be multidist. If that's
+    # not the case, it'll fail in the process of installing dependencies.
+    #
+    # [1] https://gitlab.com/gitlab-org/gitlab/-/issues/12551
+
+    if [ -e buildinfos/ubports.depends.buildinfo ]; then
+      if [ -z "$CHANGE_TARGET" ]; then
+        echo "Error: ubports.depends is not supposed to be used for the main branch."
+        exit 1
+      fi
+
+      while read -r dependency; do
+        if ! [[ "$dependency" =~ ^PR_[a-zA-Z0-9_-]+_[0-9]+$ ]]; then
+          echo "Error: ubports.depends line is malformed. Don't specify" \
+               "distro prefix for main-branch MR. The line is: ${dependency}"
+          exit 1 
+        fi
+
+        echo "${d}_-_${dependency}" >> "mbuild/${d}/ubports.depends"
+      done <buildinfos/ubports.depends.buildinfo
+    fi
   done < <(printf '%s' "$BUILD_DISTS_MULTI")
   tar -zcvf multidist.tar.gz mbuild
 
