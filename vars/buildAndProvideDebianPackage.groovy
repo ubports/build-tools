@@ -107,9 +107,9 @@ def call(Boolean isArchIndependent = false, List ignoredArchs = []) {
           script {
             if (env.BRANCH_NAME in productionBranches) {
               if (currentBuild?.getPreviousBuild()?.resultIsWorseOrEqualTo("UNSTABLE")) {
-                telegramSend(message: "DEB build of ${JOB_NAME}: **FIXED**", chatId: telegramChatId)
+                notifyTelegram("DEB build of ${JOB_NAME}: **FIXED**")
               } else {
-                telegramSend(message: "DEB build of ${JOB_NAME}: **SUCCESS**", chatId: telegramChatId)
+                notifyTelegram("DEB build of ${JOB_NAME}: **SUCCESS**")
               }
             }
           }
@@ -119,7 +119,7 @@ def call(Boolean isArchIndependent = false, List ignoredArchs = []) {
         node('master') {
           script {
             if (env.BRANCH_NAME in productionBranches) {
-              telegramSend(message: "DEB build of ${JOB_NAME}: **UNSTABLE**, check ${JOB_URL}", chatId: telegramChatId)
+              notifyTelegram("DEB build of ${JOB_NAME}: **UNSTABLE**, check ${JOB_URL}")
             }
           }
         }
@@ -129,9 +129,9 @@ def call(Boolean isArchIndependent = false, List ignoredArchs = []) {
           script {
             if (env.BRANCH_NAME in productionBranches) {
               if (currentBuild?.getPreviousBuild()?.resultIsWorseOrEqualTo("FAILURE")) {
-                telegramSend(message: "DEB build of ${JOB_NAME}: **NOT FIXED**, check ${JOB_URL}", chatId: telegramChatId)
+                notifyTelegram("DEB build of ${JOB_NAME}: **NOT FIXED**, check ${JOB_URL}")
               } else {
-                telegramSend(message: "DEB build of ${JOB_NAME}: **FAILURE**, check ${JOB_URL}", chatId: telegramChatId)
+                notifyTelegram("DEB build of ${JOB_NAME}: **FAILURE**, check ${JOB_URL}")
               }
             }
           }
@@ -140,3 +140,10 @@ def call(Boolean isArchIndependent = false, List ignoredArchs = []) {
     }
   }
 }
+
+def notifyTelegram(String message) {
+  withCredentials([usernamePassword(credentialsId: 'a25d8b20-4a81-43e9-ac37-dcfb5285790a', usernameVariable: 'TELEGRAM_BOT_CREDS_USR', passwordVariable: 'TELEGRAM_BOT_CREDS_PWD')]) {
+    sh('curl -s -X POST https://api.telegram.org/$TELEGRAM_BOT_CREDS_PWD/sendMessage -d chat_id=$TELEGRAM_BOT_CREDS_USR -d text="${message}"')
+  }
+}
+
