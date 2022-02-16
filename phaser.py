@@ -17,6 +17,7 @@
 
 # I phase images!
 
+import requests
 import argparse
 import datetime
 import json
@@ -26,6 +27,8 @@ import time
 import sys
 
 import requests
+
+PUSH_BROADCAST_URL = 'https://push.ubports.com/broadcast'
 
 def die(m):
     print(m)
@@ -200,3 +203,27 @@ for channel, devices in devices_in_channels.items():
             if result.returncode != 0:
                 print("Error during execution of copy-image, result might be broken!")
                 sys.exit(result.returncode)
+            if to_phase == 100:
+                print(
+                    ("At the end of phasing: Sending broadcast push notification for device '{}' on channel "
+                     "'{}' and version '{}'").format(
+                        device,
+                        channel,
+                        version))
+                expiresTime = datetime.datetime.utcnow() + datetime.timedelta(days=30)
+                identifier = "{}/{}".format(channel, device)
+                pushData = {
+                    "channel": "system",
+                    "expire_on": expiresTime.replace(microsecond=0).isoformat() + "Z",
+                    "data": {
+                        identifier: [new_version, '']
+                        }
+                    }
+                r = requests.post(
+                    PUSH_BROADCAST_URL,
+                    data=json.dumps(pushData),
+                    headers={'content-type': 'application/json'})
+                if r.status_code != 200:
+                    logging.error(
+                        "Push notification failed with: \nHTTP {}\n{}\n".format(
+                            r.status_code, r.text))
