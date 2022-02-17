@@ -111,14 +111,13 @@ def checkGithubLabel(label):
 
     return blocker
 
-def sendBroadcastPushNotification(device, channel, version):
+def sendBroadcastPushNotification(device, channel, version, expiresTime):
     print(
         ("Sending broadcast push notification for device '{}' on channel "
          "'{}' and version '{}'").format(
             device,
             channel,
             version))
-    expiresTime = datetime.datetime.utcnow() + datetime.timedelta(days=30)
     identifier = "{}/{}".format(channel, device)
     pushData = {
         "channel": "system",
@@ -243,4 +242,9 @@ for channel, devices in devices_in_channels.items():
                 print("Error during execution of copy-image, result might be broken!")
                 sys.exit(result.returncode)
             if to_phase % 10  == 0:
-                sendBroadcastPushNotification(device, channel, version)
+                expiresTime = datetime.datetime.utcnow()
+                if to_phase == 100:
+                    expiresTime = expiresTime + datetime.timedelta(hours=10)
+                else:
+                    expiresTime = expiresTime + datetime.timedelta(days=30)
+                sendBroadcastPushNotification(device, channel, version, expiresTime)
