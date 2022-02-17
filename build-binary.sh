@@ -67,9 +67,10 @@ if [ -f multidist.buildinfo ]; then
 	rootwp=$(pwd)
 	export rootwp
 
-	# Move orig to mbuild folder
+	# Links orig to mbuild folder
 	find "$rootwp" \
-        -maxdepth 1 -type f -name '*.orig.*' \
+        -maxdepth 1 -type f \
+		'(' -name '*.orig.*' -o -name '*.orig-*.*' ')' \
         -exec mv '{}' "$rootwp/mbuild" ';'
 
 	for d in $MULTI_DIST ; do
