@@ -113,7 +113,7 @@ def checkGithubLabel(label):
 
 def sendBroadcastPushNotification(device, channel, version):
     print(
-        ("At the end of phasing: Sending broadcast push notification for device '{}' on channel "
+        ("Sending broadcast push notification for device '{}' on channel "
          "'{}' and version '{}'").format(
             device,
             channel,
@@ -207,8 +207,6 @@ for channel, devices in devices_in_channels.items():
         phase_ver = getPhaseVersionForTag(index, args.tag)
         if not phase_ver:
             print("Did not find phase for {} in {}".format(device, channel))
-            #version = getVersionForTag(index, args.tag)
-            #sendBroadcastPushNotification(device, channel, version)
             continue
 
         phase = phase_ver["phase"]
