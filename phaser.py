@@ -82,6 +82,17 @@ def getPhaseVersionForTag(index, tag):
                 }
     return False
 
+def getVersionForTag(index, tag):
+    for image in index["images"]:
+        raw_tag = image["version_detail"].split(",")
+        for detail in raw_tag:
+            if detail.startswith("tag="):
+                image_tag = detail.split("=")[1]
+                break
+        if image_tag == tag:
+            return int(image["version"])
+    return False
+
 def checkGithubLabel(label):
     issuesPayload = {"labels": label, "state": "open"}
     issues = requests.get("https://api.github.com/repos/ubports/ubuntu-touch/issues", params=issuesPayload)
@@ -100,6 +111,34 @@ def checkGithubLabel(label):
 
     return blocker
 
+def sendBroadcastPushNotification(device, channel, version):
+    print(
+        ("At the end of phasing: Sending broadcast push notification for device '{}' on channel "
+         "'{}' and version '{}'").format(
+            device,
+            channel,
+            version))
+    expiresTime = datetime.datetime.utcnow() + datetime.timedelta(days=30)
+    identifier = "{}/{}".format(channel, device)
+    pushData = {
+        "channel": "system",
+        "expire_on": expiresTime.replace(microsecond=0).isoformat() + "Z",
+        "data": {
+            identifier: [version, '']
+            }
+        }
+    payload = json.dumps(pushData)
+    if args.dry:
+        print(payload)
+    else:
+        r = requests.post(
+            PUSH_BROADCAST_URL,
+            data=payload,
+            headers={'content-type': 'application/json'})
+        if r.status_code != 200:
+            logging.error(
+                "Push notification failed with: \nHTTP {}\n{}\n".format(
+                    r.status_code, r.text))
 
 parser = argparse.ArgumentParser(description='I promote images!')
 parser.add_argument("set_phase_script", metavar="SET-PHASE-SCRIPT")
@@ -168,6 +207,8 @@ for channel, devices in devices_in_channels.items():
         phase_ver = getPhaseVersionForTag(index, args.tag)
         if not phase_ver:
             print("Did not find phase for {} in {}".format(device, channel))
+            #version = getVersionForTag(index, args.tag)
+            #sendBroadcastPushNotification(device, channel, version)
             continue
 
         phase = phase_ver["phase"]
@@ -203,27 +244,5 @@ for channel, devices in devices_in_channels.items():
             if result.returncode != 0:
                 print("Error during execution of copy-image, result might be broken!")
                 sys.exit(result.returncode)
-            if to_phase == 100:
-                print(
-                    ("At the end of phasing: Sending broadcast push notification for device '{}' on channel "
-                     "'{}' and version '{}'").format(
-                        device,
-                        channel,
-                        version))
-                expiresTime = datetime.datetime.utcnow() + datetime.timedelta(days=30)
-                identifier = "{}/{}".format(channel, device)
-                pushData = {
-                    "channel": "system",
-                    "expire_on": expiresTime.replace(microsecond=0).isoformat() + "Z",
-                    "data": {
-                        identifier: [new_version, '']
-                        }
-                    }
-                r = requests.post(
-                    PUSH_BROADCAST_URL,
-                    data=json.dumps(pushData),
-                    headers={'content-type': 'application/json'})
-                if r.status_code != 200:
-                    logging.error(
-                        "Push notification failed with: \nHTTP {}\n{}\n".format(
-                            r.status_code, r.text))
+            if to_phase % 10  == 0:
+                sendBroadcastPushNotification(device, channel, version)
