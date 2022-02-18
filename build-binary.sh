@@ -67,7 +67,7 @@ if [ -f multidist.buildinfo ]; then
 	rootwp=$(pwd)
 	export rootwp
 
-	# Links orig to mbuild folder
+	# Moves orig to mbuild folder
 	find "$rootwp" \
         -maxdepth 1 -type f \
 		'(' -name '*.orig.*' -o -name '*.orig-*.*' ')' \
@@ -92,7 +92,8 @@ if [ -f multidist.buildinfo ]; then
 
 		# Ensure orig tarball exists
 		find ../ \
-			-maxdepth 1 -type f -name '*.orig.*' \
+			-maxdepth 1 -type f \
+			'(' -name '*.orig.*' -o -name '*.orig-*.*' ')' \
 			-exec ln -s '{}' ./ ';'
 
 		/usr/bin/build-and-provide-package
