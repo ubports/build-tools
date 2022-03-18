@@ -2,7 +2,13 @@ def call(Boolean isArchIndependent = false, List ignoredArchs = []) {
   String stashFileList = '*.gz,*.bz2,*.xz,*.deb,*.ddeb,*.udeb,*.dsc,*.changes,*.buildinfo,lintian.txt'
   String archiveFileList = '*.gz,*.bz2,*.xz,*.deb,*.ddeb,*.udeb,*.dsc,*.changes,*.buildinfo'
   long telegramChatId = -1001480273427
-  def productionBranches = ['xenial', 'master', 'ubports/xenial', 'ubports/xenial_-_android9', 'ubports/xenial_-_edge', 'xenial_-_android9', 'xenial_-_edge', 'xenial_-_edge_-_android9', 'xenial_-_edge_-_pine', 'xenial_-_edge_-_wayland']
+  def productionBranches = [
+    'master',
+    'xenial', 'ubports/xenial',
+    'xenial_-_android9', 'ubports/xenial_-_android9',
+    'ubports/xenial_-_edge', 'xenial_-_edge',
+    'xenial_-_edge_-_android9', 'xenial_-_edge_-_pine', 'xenial_-_edge_-_wayland'
+  ]
   pipeline {
     agent none
     options {
