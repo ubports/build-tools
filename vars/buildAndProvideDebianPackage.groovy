@@ -1,7 +1,6 @@
 def call(Boolean isArchIndependent = false, List ignoredArchs = []) {
   String stashFileList = '*.gz,*.bz2,*.xz,*.deb,*.ddeb,*.udeb,*.dsc,*.changes,*.buildinfo,lintian.txt'
   String archiveFileList = '*.gz,*.bz2,*.xz,*.deb,*.ddeb,*.udeb,*.dsc,*.changes,*.buildinfo'
-  long telegramChatId = -1001480273427
   def productionBranches = [
     'master', 'main', 'ubports/latest',
     'xenial', 'ubports/xenial',
@@ -108,37 +107,15 @@ def call(Boolean isArchIndependent = false, List ignoredArchs = []) {
       }
     }
     post {
-      success {
+      always {
         node('master') {
           script {
             if (env.BRANCH_NAME in productionBranches) {
-              if (currentBuild?.getPreviousBuild()?.resultIsWorseOrEqualTo("UNSTABLE")) {
-                notifyTelegram("DEB build of ${JOB_NAME}: **FIXED**")
-              } else {
-                notifyTelegram("DEB build of ${JOB_NAME}: **SUCCESS**")
-              }
-            }
-          }
-        }
-      }
-      unstable {
-        node('master') {
-          script {
-            if (env.BRANCH_NAME in productionBranches) {
-              notifyTelegram("DEB build of ${JOB_NAME}: **UNSTABLE**, check ${JOB_URL}")
-            }
-          }
-        }
-      }
-      failure {
-        node('master') {
-          script {
-            if (env.BRANCH_NAME in productionBranches) {
-              if (currentBuild?.getPreviousBuild()?.resultIsWorseOrEqualTo("FAILURE")) {
-                notifyTelegram("DEB build of ${JOB_NAME}: **NOT FIXED**, check ${JOB_URL}")
-              } else {
-                notifyTelegram("DEB build of ${JOB_NAME}: **FAILURE**, check ${JOB_URL}")
-              }
+              notifyBuildStatus(
+                currentBuild,
+                /* jobDescription */ "DEB build of ${JOB_NAME}",
+                /* jobUrl */ env.JOB_URL
+              );
             }
           }
         }
@@ -146,11 +123,3 @@ def call(Boolean isArchIndependent = false, List ignoredArchs = []) {
     }
   }
 }
-
-def notifyTelegram(String message) {
-  withCredentials([usernamePassword(credentialsId: 'a25d8b20-4a81-43e9-ac37-dcfb5285790a', usernameVariable: 'TELEGRAM_BOT_CREDS_USR', passwordVariable: 'TELEGRAM_BOT_CREDS_PWD')]) {
-    env['TELEGRAM_BOT_MSG'] = message
-    sh('curl -s -X POST https://api.telegram.org/$TELEGRAM_BOT_CREDS_PWD/sendMessage -d chat_id=$TELEGRAM_BOT_CREDS_USR -d text="$TELEGRAM_BOT_MSG"')
-  }
-}
-
