@@ -34,7 +34,7 @@ def call(Boolean isArchIndependent = false, List ignoredArchs = []) {
       stage('Build binaries') {
         parallel {
           stage('Build binary - armhf') {
-            agent { label 'arm64' }
+            agent { label 'armhf' }
             when { expression { return !isArchIndependent && !ignoredArchs.contains('armhf') } }
             steps {
               deleteDir()
