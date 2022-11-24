@@ -244,7 +244,7 @@ for channel, devices in devices_in_channels.items():
             if to_phase % 10  == 0:
                 expiresTime = datetime.datetime.utcnow()
                 if to_phase == 100:
-                    expiresTime = expiresTime + datetime.timedelta(hours=10)
+                    expiresTime = expiresTime + datetime.timedelta(days=60)
                 else:
-                    expiresTime = expiresTime + datetime.timedelta(days=30)
+                    expiresTime = expiresTime + datetime.timedelta(hours=10)
                 sendBroadcastPushNotification(device, channel, version, expiresTime)
