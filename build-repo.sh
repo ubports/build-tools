@@ -17,12 +17,6 @@
 
 set -xe
 
-mkdir -p binaries
-
-export PROVIDE_ONLY=true
-export SUDO_CMD=sudo
-export BASE_PATH="binaries/"
-
 # Aptly does not need sudo, as the jenkins user is in the aptly group
 
 if [ -f multidist.buildinfo ]; then
@@ -37,43 +31,25 @@ if [ -f multidist.buildinfo ]; then
 
   for d in $MULTI_DIST ; do
     echo "Repo-ing for $d"
-    export WORKSPACE="$rootwp/mbuild/$d"
-    cd "$WORKSPACE"
+    cd "$rootwp/mbuild/$d"
 
     release="$(cat ubports.target_apt_repository.buildinfo)"
     distribution=$d
-    REPOS="$release"
-    export release distribution REPOS
+    export release distribution
 
     if ! aptly -db-open-attempts=400 repo show "$release" ; then
       aptly -db-open-attempts=400 repo create -distribution="$release" "$release"
       aptly -db-open-attempts=400 publish repo -origin='UBports' "$release" filesystem:repo:main
     fi
-    aptly -db-open-attempts=400 repo include -no-remove-files -repo="$release" .
+    aptly -db-open-attempts=400 repo include -repo="$release" .
     aptly -db-open-attempts=400 publish update "$release" filesystem:repo:main
 
-    if [[ $release =~ ^xenial($|_-_) ]]; then
-      # Freight is unable to handle .{d,u}deb files, so ignore those
-      # Also move to "./binaries" is only needed for freight as its both hardcoded
-      # and to make sure freight only pics up the right files, but not needed
-      # for aptly since we use .changes
-      mkdir $BASE_PATH || true
-      for suffix in gz bz2 xz deb dsc changes buildinfo ; do
-          mv ./*.${suffix} $BASE_PATH || true
-      done
-      # Make a copy of the orig since we moved the files making the symlink invalid
-      cp "../*.orig.*" $BASE_PATH || true
-
-      /usr/bin/build-and-provide-package
-    fi
-
     cd "$rootwp"
-	done
+    done
 else
   release="$(cat ubports.target_apt_repository.buildinfo)"
   distribution=$(cat distribution.buildinfo)
-  REPOS="$release"
-  export release distribution REPOS
+  export release distribution
 
   # Publish built packages to Aptly repo.
   if ! aptly -db-open-attempts=400 repo show "$release" ; then
@@ -81,21 +57,6 @@ else
     aptly -db-open-attempts=400 publish repo -origin='UBports' "$release" filesystem:repo:main
   fi
 
-  # -no-remove-files leaves the files on the disk, so that we can also publish
-  # them to Freight repo.
-  aptly -db-open-attempts=400 repo include -no-remove-files -repo="$release" .
+  aptly -db-open-attempts=400 repo include -repo="$release" .
   aptly -db-open-attempts=400 publish update "$release" filesystem:repo:main
-
-  # Todo remove once xenial is gone
-  if [[ $release =~ ^xenial($|_-_) ]]; then
-    # Freight is unable to handle .{d,u}deb files, so ignore those
-    # Also move to "./binaries" is only needed for freight as its both hardcoded
-    # and to make sure freight only pics up the right files, but not needed
-    # for aptly since we use .changes
-    for suffix in gz bz2 xz deb dsc changes buildinfo ; do
-      mv ./*.${suffix} $BASE_PATH || true
-    done
-
-    /usr/bin/build-and-provide-package
-  fi
 fi
