@@ -1,4 +1,8 @@
-def call(Boolean isArchIndependent = false, List ignoredArchs = []) {
+def call(
+    Boolean isArchIndependent = false,
+    List ignoredArchs = [],
+    Boolean isHeavyPackage = false)
+{
   String stashFileList = '*.gz,*.bz2,*.xz,*.deb,*.ddeb,*.udeb,*.dsc,*.changes,*.buildinfo,lintian.txt'
   String archiveFileList = '*.gz,*.bz2,*.xz,*.deb,*.ddeb,*.udeb,*.dsc,*.changes,*.buildinfo'
   def productionBranches = [
@@ -34,7 +38,7 @@ def call(Boolean isArchIndependent = false, List ignoredArchs = []) {
       stage('Build binaries') {
         parallel {
           stage('Build binary - armhf') {
-            agent { label 'armhf' }
+            agent { label (isHeavyPackage ? 'armhf-fast' : 'armhf') }
             when { expression { return !isArchIndependent && !ignoredArchs.contains('armhf') } }
             steps {
               deleteDir()
@@ -49,7 +53,7 @@ def call(Boolean isArchIndependent = false, List ignoredArchs = []) {
             }
           }
           stage('Build binary - arm64') {
-            agent { label 'arm64' }
+            agent { label (isHeavyPackage ? 'arm64-fast' : 'arm64') }
             when { expression { return !isArchIndependent && !ignoredArchs.contains('arm64') } }
             steps {
               deleteDir()
@@ -64,7 +68,7 @@ def call(Boolean isArchIndependent = false, List ignoredArchs = []) {
             }
           }
           stage('Build binary - amd64') {
-            agent { label 'amd64' }
+            agent { label (isHeavyPackage ? 'amd64-fast' : 'amd64') }
             // Always run; arch-independent packages are built here.
             steps {
               deleteDir()
