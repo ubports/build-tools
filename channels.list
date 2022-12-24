@@ -2,3 +2,5 @@ ubports-touch/16.04/devel => ubports-touch/16.04/rc
 16.04/arm64/hybris/devel => 16.04/arm64/hybris/rc
 16.04/armhf/hybris/devel => 16.04/armhf/hybris/rc
 16.04/arm64/android9/devel => 16.04/arm64/android9/rc
+20.04/arm64/android9plus/devel => 20.04/arm64/android9plus/rc
+20.04/arm64/hybris/devel => 20.04/arm64/hybris/rc
