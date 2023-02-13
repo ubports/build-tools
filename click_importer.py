@@ -61,8 +61,8 @@ class Ctrl(object):
         self.config = config
 
 
-def get_app_info(app, architecture):
-    r = requests.get(APPS_API + app, params={"architecture": architecture})
+def get_app_info(app):
+    r = requests.get(APPS_API + app)
     if not r.status_code == 200:
         return False
     return r.json()["data"]
@@ -142,7 +142,7 @@ def click_name(app_id, version, architecture):
 
 
 DEFAULT_DIR = "clicks"
-BASE_API = "http://open-store.io/api/v3/"
+BASE_API = "http://open-store.io/api/v4/"
 APPS_API = BASE_API + "apps/"
 
 
@@ -192,11 +192,11 @@ ctrl = Ctrl(output_dir)
 click_list = []
 
 for app in apps:
-    app_info = get_app_info(app, arch)
+    app_info = get_app_info(app)
     if app_info:
         download_found = False
         for download in app_info["downloads"]:
-            if download["channel"] == channel:
+            if download["channel"] == channel and download["architecture"] in ("all", arch):
                 download_found = download
 
         app_id = app_info["id"]
