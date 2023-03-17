@@ -129,7 +129,7 @@ checks_and_defaults() {
     FREIGHT_VARCACHE=${FREIGHT_BASE}/default
     FREIGHT_CONF=${FREIGHT_BASE}/default.conf
   else
-    # Default to /srv/freight unless specifed
+    # Default to /srv/freight unless specified
     if [ -z "${FREIGHT_BASE:-}" ] ; then
       FREIGHT_BASE=/srv/freight
     fi
@@ -897,7 +897,13 @@ reprepro_wrapper() {
     bailout 1 "Error: repository ${REPOSITORY} does not exist."
   fi
 
-  ${SUDO_CMD:-} generate-reprepro-codename "${REPOS}"
+  if ! [ -r "${REPOSITORY}"/conf/distributions ] ; then
+    echo "*** reprepro configuration file ${REPOSITORY}/conf/distributions does not exist, generating now ***"
+    ${SUDO_CMD:-} generate-reprepro-codename "${REPOS}"
+  elif ! ${SUDO_CMD:-} grep -q "^\(Codename\|Suite\): ${REPOS}$" "${REPOSITORY}"/conf/distributions ; then
+    echo "*** Codename ${REPOS} does not exist in repository ${REPOSITORY}, generating now ***"
+    ${SUDO_CMD:-} generate-reprepro-codename "${REPOS}"
+  fi
 
   remove_packages
   remove_missing_binary_packages
