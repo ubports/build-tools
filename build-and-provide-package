@@ -969,20 +969,11 @@ freight_wrapper() {
   freight_ensure_repo
 
   echo "*** Including packages via freight in repository ${FREIGHT_VARLIB}/${REPOS} ***"
-  ${SUDO_CMD:-} freight add -v -c "$FREIGHT_CONF" "${WORKSPACE}/binaries/"*"deb" "apt/${REPOS}"
+  ${SUDO_CMD:-} freight add -v -c "$FREIGHT_CONF" "${WORKSPACE}/binaries/"*"_${newest_version}"*"deb" "apt/${REPOS}"
   [ $? -eq 0 ] || bailout 1 "Error: Failed to add binary package to repository."
-  echo "*** Including any source packages we also need in repository ${FREIGHT_VARLIB}/${REPOS} ***"
-  for ext in xz gz dsc; do
-    for i in ${WORKSPACE}/binaries/*.${ext}; do
-        [ -f "$i" ] || break
-        ${SUDO_CMD:-} freight add -v -c "$FREIGHT_CONF" "$i" "apt/${REPOS}"
-    done
-  done
 
   echo "*** Generating freight cache ***"
-  if [ -z "${SHIP_FREIGHT_CACHE:-}" ] ; then
-     ${SUDO_CMD:-} freight cache -v -c "$FREIGHT_CONF" "apt/${REPOS}"
-  fi
+  ${SUDO_CMD:-} freight cache -v -c "$FREIGHT_CONF"
   [ $? -eq 0 ] || bailout 1 "Error: Failed to generate freight cache for ${FREIGHT_VARCACHE}."
 }
 
