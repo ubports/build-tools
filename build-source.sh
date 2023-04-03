@@ -52,9 +52,10 @@ MULTIDIST_BRANCHES="main master ubports/latest"
 BUILD_DISTS_MULTI="\
 xenial ubports16.04
 focal ubports20.04
+sid ubports.sid
 "
 
-VALID_DISTS_UBUNTU="xenial bionic focal groovy"
+VALID_DISTS_UBUNTU="xenial bionic focal groovy hirsute"
 VALID_DISTS_DEBIAN="buster bullseye sid"
 VALID_DISTS="$VALID_DISTS_UBUNTU $VALID_DISTS_DEBIAN"
 
