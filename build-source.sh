@@ -50,7 +50,6 @@ pr_repo_naming() {
 MULTIDIST_BRANCHES="main master ubports/latest"
 # Contains the distribution name and versioning suffix
 BUILD_DISTS_MULTI="\
-xenial ubports16.04
 focal ubports20.04
 "
 
