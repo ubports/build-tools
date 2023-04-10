@@ -54,7 +54,7 @@ xenial ubports16.04
 focal ubports20.04
 "
 
-VALID_DISTS_UBUNTU="xenial bionic focal groovy"
+VALID_DISTS_UBUNTU="xenial bionic focal jammy lunar"
 VALID_DISTS_DEBIAN="buster bullseye sid"
 VALID_DISTS="$VALID_DISTS_UBUNTU $VALID_DISTS_DEBIAN"
 
