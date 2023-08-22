@@ -86,7 +86,7 @@ fi
 
 source_location_file=$(sourcedebian_or_source ubports.source_location)
 if [ -n "$source_location_file" ]; then
-  echo "WARNING: ubports.source_location file is depricated, please use debian/watch file"
+  echo "WARNING: ubports.source_location file is deprecated, please use debian/watch file"
   while read -r SOURCE_URL && read -r SOURCE_FILENAME; do
     if [ -f "$SOURCE_FILENAME" ]; then
       rm "$SOURCE_FILENAME"
