@@ -47,7 +47,7 @@ pr_repo_naming() {
 }
 
 # Multi distro, set here to build master for multripple distros!
-MULTIDIST_BRANCHES="main master ubports/latest"
+MULTIDIST_BRANCHES="main master ubports/latest ubports/contrib"
 # Contains the distribution name and versioning suffix
 BUILD_DISTS_MULTI="\
 focal ubports20.04

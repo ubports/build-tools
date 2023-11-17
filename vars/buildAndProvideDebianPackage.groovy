@@ -6,7 +6,7 @@ def call(
   String stashFileList = '*.gz,*.bz2,*.xz,*.deb,*.ddeb,*.udeb,*.dsc,*.changes,*.buildinfo,lintian.txt'
   String archiveFileList = '*.gz,*.bz2,*.xz,*.deb,*.ddeb,*.udeb,*.dsc,*.changes,*.buildinfo'
   def productionBranches = [
-    'master', 'main', 'ubports/latest',
+    'master', 'main', 'ubports/latest', 'ubports/contrib',
     'xenial', 'ubports/xenial',
     'xenial_-_android9', 'ubports/xenial_-_android9',
     'ubports/xenial_-_edge', 'xenial_-_edge',
