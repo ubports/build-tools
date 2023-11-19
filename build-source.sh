@@ -78,8 +78,14 @@ export GIT_COMMIT
 export GIT_BRANCH="$BRANCH_NAME"
 cd ..
 
+source_format=$(cat source/debian/source/format)
+if [[ $source_format != 3.0* ]]; then
+   echo "WARNING: Please upgrade debian source format to 3.0"
+fi
+
 source_location_file=$(sourcedebian_or_source ubports.source_location)
 if [ -n "$source_location_file" ]; then
+  echo "WARNING: ubports.source_location file is deprecated, please use debian/watch file"
   while read -r SOURCE_URL && read -r SOURCE_FILENAME; do
     if [ -f "$SOURCE_FILENAME" ]; then
       rm "$SOURCE_FILENAME"
@@ -87,7 +93,15 @@ if [ -n "$source_location_file" ]; then
 
     wget -O "$SOURCE_FILENAME" "$SOURCE_URL"
   done <"$source_location_file"
+  is_quilt=1;
+elif [[ $source_format == "3.0 (quilt)" ]]; then
+  cd source
+  uscan --noconf --force-download --rename --download-current-version --destdir=..
+  cd ..
+  is_quilt=1;
+fi
 
+if [ -n "$is_quilt" ]; then
   export IGNORE_GIT_BUILDPACKAGE=true
   # FIXME: This relies on UBports-specific change to generate-git-snapshot.
   # Maybe using PRE_SOURCE_HOOK, but it accepts shell script file path and
