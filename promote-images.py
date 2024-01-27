@@ -81,7 +81,7 @@ def getDevicesForAll(channels):
 
 def getLastTag(channel):
     tag = None
-    index = requests.get("https://system-image.ubports.com/ubports-touch/16.04/%s/bacon/index.json" % channel)
+    index = requests.get("https://system-image.ubports.com/20.04/arm64/android9plus/%/FP4/index.json" % channel)
     if not index:
         return tag
     index = index.json()
